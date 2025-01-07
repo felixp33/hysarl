@@ -16,6 +16,8 @@ class EnvironmentWorker(Process):
             if cmd == 'step':
                 next_state, reward, terminated, truncated, _ = env.step(data)
                 done = terminated or truncated
+                print(
+                    f"Worker: State={state}, Action={data}, Reward={reward}, Next State={next_state}, Done={done}")
                 if done:
                     next_state, _ = env.reset()
                 self.conn.send((next_state, reward, done))
@@ -47,12 +49,16 @@ class ParallelEnvironments:
             conn.send(('step', action))
         results = [conn.recv() for conn in self.conns]
         states, rewards, dones = zip(*results)
+        print(
+            f"Main: Actions={actions}, States={states}, Rewards={rewards}, Dones={dones}")
         return states, rewards, dones
 
     def reset(self):
         for conn in self.conns:
             conn.send(('reset', None))
-        return [conn.recv() for conn in self.conns]
+        states = [conn.recv() for conn in self.conns]
+        print(f"Main: Reset States={states}")
+        return states
 
     def close(self):
         for conn in self.conns:

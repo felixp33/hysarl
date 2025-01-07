@@ -48,7 +48,7 @@ class SACAgent:
         states, actions, rewards, next_states, dones = self.replay_buffer.sample(
             batch_size)
         states = torch.FloatTensor(states)
-        actions = torch.FloatTensor(actions)
+        actions = torch.FloatTensor(actions).unsqueeze(1)
         rewards = torch.FloatTensor(rewards).unsqueeze(1)
         next_states = torch.FloatTensor(next_states)
         dones = torch.FloatTensor(dones).unsqueeze(1)
