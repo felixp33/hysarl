@@ -3,13 +3,23 @@ from multiprocessing import Process, Pipe
 
 
 class EnvironmentWorker(Process):
-    def __init__(self, env_name, conn):
+    def __init__(self, env_name, engine, conn):
         super(EnvironmentWorker, self).__init__()
         self.env_name = env_name
+        self.engine = engine
         self.conn = conn
 
     def run(self):
-        env = gym.make(self.env_name)
+        # Dynamically load engine
+        if self.engine == 'gym':
+            env = gym.make(self.env_name)
+        elif self.engine == 'mujoco':
+            env = gym.make(self.env_name)
+        elif self.engine == 'box2d':
+            env = gym.make(self.env_name)
+        else:
+            raise ValueError(f"Unsupported engine: {self.engine}")
+
         state, _ = env.reset()
         while True:
             cmd, data = self.conn.recv()
@@ -30,16 +40,16 @@ class EnvironmentWorker(Process):
                 break
 
 
-class ParallelEnvironments:
-    def __init__(self, env_name, num_envs=2):
+class EnvironmentOrchestrator:
+    def __init__(self, env_name, engines):
         self.env_name = env_name
-        self.num_envs = num_envs
+        self.engines = engines
         self.workers = []
         self.conns = []
 
-        for _ in range(num_envs):
+        for engine in engines:
             parent_conn, child_conn = Pipe()
-            worker = EnvironmentWorker(env_name, child_conn)
+            worker = EnvironmentWorker(env_name, engine, child_conn)
             worker.start()
             self.workers.append(worker)
             self.conns.append(parent_conn)
