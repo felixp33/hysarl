@@ -7,7 +7,10 @@ env_specs = {
     'LunarLander-v2': {'state_dim': 8, 'action_dim': 4},
     'HalfCheetah-v4': {'state_dim': 17, 'action_dim': 6},
     'Ant-v4': {'state_dim': 111, 'action_dim': 8},
-    'Humanoid-v4': {'state_dim': 376, 'action_dim': 17}
+    'Humanoid-v4': {'state_dim': 376, 'action_dim': 17},
+    # Continuous action space
+    'Pendulum-v1': {'state_dim': 3, 'action_dim': 1},
+    'MountainCarContinuous-v0': {'state_dim': 2, 'action_dim': 1}
 }
 
 

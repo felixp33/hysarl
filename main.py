@@ -6,7 +6,7 @@ from agents.sac_agent import SACAgent
 
 if __name__ == "__main__":
     # Parameters
-    env_name = 'CartPole-v1'
+    env_name = 'Pendulum-v1'  # CartPole-v1, Pendulum-v1, LunarLander-v2
     engines = ['gym', 'mujoco', 'box2d']  # List of engines to test
     buffer_capacity = 1000
     batch_size = 64
