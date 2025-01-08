@@ -1,13 +1,23 @@
 import gymnasium as gym
 from multiprocessing import Process, Pipe
 
+# Dictionary to store state and action dimensions for different environments
+env_specs = {
+    'CartPole-v1': {'state_dim': 4, 'action_dim': 2},
+    'LunarLander-v2': {'state_dim': 8, 'action_dim': 4},
+    'HalfCheetah-v4': {'state_dim': 17, 'action_dim': 6},
+    'Ant-v4': {'state_dim': 111, 'action_dim': 8},
+    'Humanoid-v4': {'state_dim': 376, 'action_dim': 17}
+}
+
 
 class EnvironmentWorker(Process):
-    def __init__(self, env_name, engine, conn):
+    def __init__(self, env_name, engine, conn, env_id):
         super(EnvironmentWorker, self).__init__()
         self.env_name = env_name
         self.engine = engine
         self.conn = conn
+        self.env_id = env_id
 
     def run(self):
         # Dynamically load engine
@@ -27,10 +37,10 @@ class EnvironmentWorker(Process):
                 next_state, reward, terminated, truncated, _ = env.step(data)
                 done = terminated or truncated
                 print(
-                    f"Worker: State={state}, Action={data}, Reward={reward}, Next State={next_state}, Done={done}")
+                    f"Worker {self.env_id}: State={state}, Action={data}, Reward={reward}, Next State={next_state}, Done={done}")
                 if done:
                     next_state, _ = env.reset()
-                self.conn.send((next_state, reward, done))
+                self.conn.send((next_state, reward, done, self.env_id))
             elif cmd == 'reset':
                 state, _ = env.reset()
                 self.conn.send(state)
@@ -47,9 +57,9 @@ class EnvironmentOrchestrator:
         self.workers = []
         self.conns = []
 
-        for engine in engines:
+        for i, engine in enumerate(engines):
             parent_conn, child_conn = Pipe()
-            worker = EnvironmentWorker(env_name, engine, child_conn)
+            worker = EnvironmentWorker(env_name, engine, child_conn, env_id=i)
             worker.start()
             self.workers.append(worker)
             self.conns.append(parent_conn)
@@ -58,10 +68,10 @@ class EnvironmentOrchestrator:
         for conn, action in zip(self.conns, actions):
             conn.send(('step', action))
         results = [conn.recv() for conn in self.conns]
-        states, rewards, dones = zip(*results)
+        states, rewards, dones, env_ids = zip(*results)
         print(
-            f"Main: Actions={actions}, States={states}, Rewards={rewards}, Dones={dones}")
-        return states, rewards, dones
+            f"Main: Actions={actions}, States={states}, Rewards={rewards}, Dones={dones}, Env_IDs={env_ids}")
+        return states, rewards, dones, env_ids
 
     def reset(self):
         for conn in self.conns:

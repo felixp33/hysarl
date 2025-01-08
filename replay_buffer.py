@@ -1,5 +1,4 @@
 import numpy as np
-
 import random
 from collections import deque
 
@@ -7,19 +6,73 @@ from collections import deque
 class ReplayBuffer:
     def __init__(self, capacity):
         self.capacity = capacity
-        self.buffer = deque(maxlen=capacity)
+        self.buffer = []
+        self.position = 0
 
-    def push(self, state, action, reward, next_state, done):
-        self.buffer.append((state, action, reward, next_state, done))
+    def push(self, state, action, reward, next_state, done, env_id):
+        # Add experience to the buffer
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(None)
+        self.buffer[self.position] = (
+            state, action, reward, next_state, done, env_id)
+        self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
+        # Uniform sampling
         batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
-        return (np.array(states),
-                np.array(actions),
-                np.array(rewards, dtype=np.float32),
-                np.array(next_states),
-                np.array(dones, dtype=np.float32))
+        states, actions, rewards, next_states, dones, env_ids = zip(*batch)
+        return states, actions, rewards, next_states, dones, env_ids
+
+    def stratified_sampling(self, batch_size, composition):
+        """
+        Perform stratified sampling based on the proportions defined in the composition dictionary.
+        :param batch_size: Total number of samples to draw.
+        :param composition: Dictionary with env_id as key and proportion as value.
+        :return: Sampled batch of experiences.
+        """
+        samples = []
+
+        # Count total proportions
+        total_proportions = sum(composition.values())
+
+        # Group experiences by environment ID
+        grouped = {}
+        for experience in self.buffer:
+            env_id = experience[-1]  # Last element is env_id
+            if env_id not in grouped:
+                grouped[env_id] = []
+            grouped[env_id].append(experience)
+
+        # Perform stratified sampling
+        for env_id, proportion in composition.items():
+            if env_id in grouped:
+                # Calculate the number of samples to draw from this environment
+                num_samples = int(
+                    (proportion / total_proportions) * batch_size)
+                samples.extend(random.sample(grouped[env_id], min(
+                    num_samples, len(grouped[env_id]))))
+
+        # Continue sampling from all available experiences to fill the remaining batch size
+        remaining_samples = batch_size - len(samples)
+        if remaining_samples > 0:
+            additional_samples = random.sample(self.buffer, remaining_samples)
+            samples.extend(additional_samples)
+
+        # Unpack the samples into separate arrays
+        states, actions, rewards, next_states, dones, env_ids = zip(*samples)
+        return states, actions, rewards, next_states, dones, env_ids
 
     def __len__(self):
+        # Return current size of the buffer
         return len(self.buffer)
+
+    def get_env_id_distribution(self):
+        """
+        Returns the count of samples grouped by env_id.
+        """
+        env_id_counts = {}
+        for _, _, _, _, _, env_id in self.buffer:
+            if env_id not in env_id_counts:
+                env_id_counts[env_id] = 0
+            env_id_counts[env_id] += 1
+        return env_id_counts

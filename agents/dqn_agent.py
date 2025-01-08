@@ -54,7 +54,7 @@ class DQNAgent:
             return
 
         # Sample experiences
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample(
+        states, actions, rewards, next_states, dones, env_ids = self.replay_buffer.sample(
             batch_size)
         states = torch.FloatTensor(states).to(self.device)
         actions = torch.LongTensor(actions).unsqueeze(1).to(self.device)
