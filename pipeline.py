@@ -29,7 +29,8 @@ class TrainingPipeline:
         self.agent = agent
 
         # Initialize the dashboard for visualization
-        self.dashboard = Dashboard(len(engines))
+        self.dashboard = Dashboard(
+            len(engines), {'Environment: ': env_name, 'Engines: ': engines, 'Buffer Capacity: ': buffer_capacity, 'Batch Size: ': batch_size, 'Episodes: ': episodes, 'Steps per Episode: ': steps_per_episode})
 
     def run(self):
         plt.ion()  # Enable interactive mode for live plotting

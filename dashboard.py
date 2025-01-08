@@ -3,15 +3,24 @@ import numpy as np
 
 
 class Dashboard:
-    def __init__(self, num_envs):
+    def __init__(self, num_envs, params):
         # Initialize 2x2 grid layout
         self.fig, self.axes = plt.subplots(
             2, 2, figsize=(12, 10))  # 2 rows, 2 columns
         plt.ion()  # Enable interactive mode for live updates
 
+        # Display parameters at the top
+        self.fig.suptitle(self.format_params(params), fontsize=10)
+
         # Track buffer distribution history
         self.buffer_history = {env_id: [] for env_id in range(num_envs)}
         self.episodes = []
+
+    def format_params(self, params):
+        """
+        Formats parameters into a readable string.
+        """
+        return '\n'.join([f"{key}: {value}" for key, value in params.items()])
 
     def plot_rewards(self, rewards_history):
         """

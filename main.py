@@ -12,6 +12,9 @@ if __name__ == "__main__":
     batch_size = 64
     episodes = 500
     steps_per_episode = 200
+    sampling_strategy = 'uniform'  # 'stratified', ...
+    buffer_compositon_type = 'standard'  # 'standard', 'fixed',...
+    buffer_compositon = [0.4, 0.4, 0.2]
 
     # Fetch dimensions from environment specs
     state_dim = env_specs[env_name]['state_dim']

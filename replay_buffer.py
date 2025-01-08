@@ -8,6 +8,7 @@ class ReplayBuffer:
         self.capacity = capacity
         self.buffer = []
         self.position = 0
+        self.strategy = 'standard'
 
     def push(self, state, action, reward, next_state, done, env_id):
         # Add experience to the buffer
