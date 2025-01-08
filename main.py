@@ -12,8 +12,9 @@ if __name__ == "__main__":
     batch_size = 64
     episodes = 500
     steps_per_episode = 200
-    sampling_strategy = 'uniform'  # 'stratified', ...
-    buffer_compositon_type = 'standard'  # 'standard', 'fixed',...
+    sampling_strategy = 'uniform'  # stratified, ...
+
+    buffer_compositon_type = 'standard'  # standard, fixed, ...
     buffer_compositon = [0.4, 0.4, 0.2]
 
     # Fetch dimensions from environment specs
@@ -21,7 +22,8 @@ if __name__ == "__main__":
     action_dim = env_specs[env_name]['action_dim']
 
     # Initialize replay buffer and agent
-    replay_buffer = ReplayBuffer(capacity=buffer_capacity)
+    replay_buffer = ReplayBuffer(
+        capacity=buffer_capacity, strategy=sampling_strategy)
     agent = SACAgent(state_dim, action_dim, replay_buffer)
 
     # Create and run training pipeline

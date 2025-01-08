@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+# TODO: imolement time obersavtion
+
 
 class Dashboard:
     def __init__(self, num_envs, params):

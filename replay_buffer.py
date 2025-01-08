@@ -4,11 +4,11 @@ from collections import deque
 
 
 class ReplayBuffer:
-    def __init__(self, capacity):
+    def __init__(self, capacity, strategy='uniform'):
         self.capacity = capacity
         self.buffer = []
         self.position = 0
-        self.strategy = 'standard'
+        self.strategy = strategy
 
     def push(self, state, action, reward, next_state, done, env_id):
         # Add experience to the buffer
@@ -18,7 +18,16 @@ class ReplayBuffer:
             state, action, reward, next_state, done, env_id)
         self.position = (self.position + 1) % self.capacity
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, composition=None):
+        if self.strategy == 'uniform':
+            return self.uniform_sampling(batch_size)
+        elif self.strategy == 'stratified':
+            if composition is None:
+                raise ValueError(
+                    "Stratified sampling requires composition dictionary.")
+            return self.stratified_sampling(batch_size, )
+
+    def uniform_sampling(self, batch_size):
         # Uniform sampling
         batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones, env_ids = zip(*batch)
