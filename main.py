@@ -2,6 +2,7 @@ from pipeline import TrainingPipeline
 from replay_buffer import ReplayBuffer
 from agents.dqn_agent import DQNAgent
 from environment import env_specs
+from agents.sac_agent import SACAgent
 
 if __name__ == "__main__":
     # Parameters
@@ -18,7 +19,7 @@ if __name__ == "__main__":
 
     # Initialize replay buffer and agent
     replay_buffer = ReplayBuffer(capacity=buffer_capacity)
-    agent = DQNAgent(state_dim, action_dim, replay_buffer)
+    agent = SACAgent(state_dim, action_dim, replay_buffer)
 
     # Create and run training pipeline
     pipeline = TrainingPipeline(

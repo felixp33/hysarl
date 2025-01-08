@@ -13,15 +13,21 @@ class SACAgent:
         self.tau = tau
         self.alpha = alpha
 
-        # Example placeholder networks (to be replaced with actual SAC networks)
+        # Actor Network
         self.actor = nn.Sequential(
             nn.Linear(state_dim, 256),
             nn.ReLU(),
-            nn.Linear(256, action_dim)
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, action_dim),
+            nn.Tanh()  # Ensure actions are bounded
         )
 
+        # Critic Networks
         self.critic1 = nn.Sequential(
             nn.Linear(state_dim + action_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
             nn.ReLU(),
             nn.Linear(256, 1)
         )
@@ -29,9 +35,18 @@ class SACAgent:
         self.critic2 = nn.Sequential(
             nn.Linear(state_dim + action_dim, 256),
             nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
             nn.Linear(256, 1)
         )
 
+        # Target Critic Networks
+        self.critic1_target = nn.Sequential(*[layer for layer in self.critic1])
+        self.critic2_target = nn.Sequential(*[layer for layer in self.critic2])
+        self.critic1_target.load_state_dict(self.critic1.state_dict())
+        self.critic2_target.load_state_dict(self.critic2.state_dict())
+
+        # Optimizers
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
         self.critic1_optimizer = optim.Adam(self.critic1.parameters(), lr=lr)
         self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=lr)
@@ -45,20 +60,20 @@ class SACAgent:
         if len(self.replay_buffer) < batch_size:
             return
 
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample(
+        states, actions, rewards, next_states, dones, _ = self.replay_buffer.sample(
             batch_size)
         states = torch.FloatTensor(states)
-        actions = torch.FloatTensor(actions).unsqueeze(1)
+        actions = torch.FloatTensor(actions)
         rewards = torch.FloatTensor(rewards).unsqueeze(1)
         next_states = torch.FloatTensor(next_states)
         dones = torch.FloatTensor(dones).unsqueeze(1)
 
-        # Compute target values (simplified example)
+        # Compute target values
         with torch.no_grad():
             next_actions = self.actor(next_states)
-            target_q1 = self.critic1(
+            target_q1 = self.critic1_target(
                 torch.cat([next_states, next_actions], dim=1))
-            target_q2 = self.critic2(
+            target_q2 = self.critic2_target(
                 torch.cat([next_states, next_actions], dim=1))
             target_q = torch.min(target_q1, target_q2) - \
                 self.alpha * next_actions
@@ -81,13 +96,24 @@ class SACAgent:
 
         # Update actor
         new_actions = self.actor(states)
-        actor_loss = - \
-            (self.critic1(torch.cat([states, new_actions],
-             dim=1)) - self.alpha * new_actions).mean()
+        actor_loss = -torch.min(
+            self.critic1(torch.cat([states, new_actions], dim=1)),
+            self.critic2(torch.cat([states, new_actions], dim=1))
+        ).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
 
-    def store_experience(self, state, action, reward, next_state, done):
-        self.replay_buffer.push(state, action, reward, next_state, done)
+        # Update target networks
+        self.soft_update(self.critic1_target, self.critic1)
+        self.soft_update(self.critic2_target, self.critic2)
+
+    def soft_update(self, target, source):
+        for target_param, source_param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(
+                self.tau * source_param.data + (1.0 - self.tau) * target_param.data)
+
+    def store_experience(self, state, action, reward, next_state, done, env_id):
+        self.replay_buffer.push(state, action, reward,
+                                next_state, done, env_id)
