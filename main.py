@@ -8,10 +8,10 @@ if __name__ == "__main__":
     # Parameters
     env_name = 'Pendulum-v1'  # CartPole-v1, Pendulum-v1, LunarLander-v2
     # List of engines to test, gym = classic conrol/simple
-    engines = ['gym', 'mujoco', 'pybullet']
+    engines = ['gym', 'gym']
     buffer_capacity = 1000
     batch_size = 64
-    episodes = 500
+    episodes = 1000
     steps_per_episode = 200
     sampling_strategy = 'uniform'  # stratified, ...
 

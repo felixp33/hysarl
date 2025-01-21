@@ -1,7 +1,8 @@
-import matplotlib.pyplot as plt
-import numpy as np
 
 # TODO: imolement time obersavtion
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Dashboard:
@@ -18,19 +19,45 @@ class Dashboard:
         self.buffer_history = {env_id: [] for env_id in range(num_envs)}
         self.episodes = []
 
+        # Initialize moving average window size
+        self.window_size = 10
+
     def format_params(self, params):
         """
         Formats parameters into a readable string.
         """
         return '\n'.join([f"{key}: {value}" for key, value in params.items()])
 
+    def calculate_moving_average(self, data, window_size=10):
+        """
+        Calculates the moving average of the rewards.
+        """
+        if len(data) < window_size:
+            return np.array(data)
+
+        weights = np.ones(window_size) / window_size
+        return np.convolve(data, weights, mode='valid')
+
     def plot_rewards(self, rewards_history):
         """
-        Plots the reward progression.
+        Plots the reward progression and moving average.
         """
         ax = self.axes[0, 0]  # Top-left plot
         ax.cla()  # Clear the plot
-        ax.plot(rewards_history, label='Average Reward')
+
+        # Plot raw rewards
+        ax.plot(rewards_history, label='Raw Reward', alpha=0.3, color='gray')
+
+        # Calculate and plot moving average
+        if len(rewards_history) >= self.window_size:
+            moving_avg = self.calculate_moving_average(
+                rewards_history, self.window_size)
+            # Adjust x-axis to align moving average with correct episodes
+            ma_episodes = np.arange(self.window_size-1, len(rewards_history))
+            ax.plot(ma_episodes, moving_avg,
+                    label=f'{self.window_size}-Episode Moving Average',
+                    color='blue', linewidth=2)
+
         ax.set_xlabel('Episode')
         ax.set_ylabel('Reward')
         ax.set_title('Training Progress')
