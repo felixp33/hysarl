@@ -9,7 +9,15 @@ env_specs = {
     'Ant-v4': {'state_dim': 111, 'action_dim': 8},
     'Humanoid-v4': {'state_dim': 376, 'action_dim': 17},
     # Continuous action space
-    'Pendulum-v1': {'state_dim': 3, 'action_dim': 1},
+    'Pendulum-v1': {
+        'state_dim': 3,
+        'action_dim': 1,
+        'engines': {
+            'gym': 'Pendulum-v1',
+            'mujoco': 'InvertedPendulum-v5',
+            'pybullet': 'InvertedPendulum-v5'  # Updated PyBullet env name
+        }
+    },
     'MountainCarContinuous-v0': {'state_dim': 2, 'action_dim': 1}
 }
 
@@ -24,14 +32,11 @@ class EnvironmentWorker(Process):
 
     def run(self):
         # Dynamically load engine
-        if self.engine == 'gym':
-            env = gym.make(self.env_name)
-        elif self.engine == 'mujoco':
-            env = gym.make(self.env_name)
-        elif self.engine == 'box2d':
-            env = gym.make(self.env_name)
-        else:
-            raise ValueError(f"Unsupported engine: {self.engine}")
+        print(self.env_name, self.engine)
+        try:
+            env = gym.make(env_specs[self.env_name]['engines'][self.engine])
+        except KeyError:
+            raise ValueError(f"Unsupported environment: {self.env_name}")
 
         state, _ = env.reset()
         while True:
