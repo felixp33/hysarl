@@ -6,13 +6,14 @@ from agents.sac_agent import SACAgent
 
 if __name__ == "__main__":
     # Parameters
-    env_name = 'Pendulum-v1'  # CartPole-v1, Pendulum-v1, LunarLander-v2
+    # CartPole-v1, Pendulum-v1, LunarLander-v2
+    env_name = 'MountainCarContinuous-v0'
     # List of engines to test, gym = classic conrol/simple
     engines = ['gym']
     buffer_capacity = 100000
     batch_size = 256
     episodes = 1000
-    steps_per_episode = 200
+    steps_per_episode = 500
     sampling_strategy = 'uniform'  # stratified, ...
 
     buffer_compositon_type = 'standard'  # standard, fixed, ...
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     replay_buffer = ReplayBuffer(
         capacity=buffer_capacity, strategy=sampling_strategy)
     agent = SACAgent(state_dim, action_dim, replay_buffer,
-                     hidden_dim=64, lr=1e-4)
+                     hidden_dim=64, lr=1e-4, alpha=0.2)
 
     # Create and run training pipeline
     pipeline = TrainingPipeline(

@@ -3,7 +3,7 @@ from multiprocessing import Process, Pipe
 
 # Dictionary to store state and action dimensions for different environments
 env_specs = {
-    'CartPole-v1': {'state_dim': 4, 'action_dim': 2},
+    'CartPole-v1': {'state_dim': 4, 'action_dim': 2, 'engines': {'gym': 'CartPole-v1'}},
     'LunarLander-v2': {'state_dim': 8, 'action_dim': 4},
     'HalfCheetah-v4': {'state_dim': 17, 'action_dim': 6},
     'Ant-v4': {'state_dim': 111, 'action_dim': 8},
@@ -18,7 +18,7 @@ env_specs = {
             'pybullet': 'InvertedPendulum-v5'  # Updated PyBullet env name
         }
     },
-    'MountainCarContinuous-v0': {'state_dim': 2, 'action_dim': 1}
+    'MountainCarContinuous-v0': {'state_dim': 2, 'action_dim': 1, 'engines': {'gym': 'MountainCarContinuous-v0'}},
 }
 
 
