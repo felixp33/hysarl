@@ -34,58 +34,70 @@ class TrainingPipeline:
 
     def run(self):
         try:
-            plt.ion()  # Enable interactive plotting
+            plt.ion()
 
             for episode in range(self.episodes):
                 states = self.envs.reset()
                 episode_rewards = [0 for _ in range(len(self.engines))]
-                episode_dones = {i: False for i in range(
-                    len(self.engines))}  # Track dones
+                episode_dones = {i: False for i in range(len(self.engines))}
                 active_envs = [True] * len(self.engines)
+                step_count = 0
 
-                for step in range(self.steps_per_episode):
-                    # Select actions only for active environments
-                    actions = []
-                    for i, state in enumerate(states):
-                        if active_envs[i]:
-                            actions.append(self.agent.select_action(state))
-                        else:
-                            actions.append(None)
+                while step_count < self.steps_per_episode:
+                    # Select actions
+                    actions = [
+                        self.agent.select_action(state) if active
+                        else None
+                        for state, active in zip(states, active_envs)
+                    ]
 
-                    # Take step in each environment
-                    next_states, rewards, dones, env_ids = self.envs.step(
-                        actions)
+                    # Take step and handle potential empty results
+                    try:
+                        next_states, rewards, dones, env_ids = self.envs.step(
+                            actions)
+                    except ValueError as e:
+                        if not any(active_envs):
+                            break  # All environments are done
+                        raise  # Re-raise if it's a different issue
 
-                    # Store experiences and update rewards only for active envs
-                    for i in range(len(self.engines)):
-                        if active_envs[i]:
+                    # Store experiences and update states
+                    for i, env_id in enumerate(env_ids):
+                        if active_envs[env_id]:
                             self.agent.replay_buffer.push(
-                                states[i], actions[i], rewards[i], next_states[i], dones[i], env_ids[i]
+                                states[env_id],
+                                actions[env_id],
+                                rewards[i],
+                                next_states[i],
+                                dones[i],
+                                env_id
                             )
-                            episode_rewards[i] += rewards[i]
+                            episode_rewards[env_id] += rewards[i]
 
-                            # Update episode_dones and active_envs when environments finish
                             if dones[i]:
-                                episode_dones[i] = True
-                                active_envs[i] = False
+                                episode_dones[env_id] = True
+                                active_envs[env_id] = False
+
+                    # Update states only for active environments
+                    for i, next_state in zip(env_ids, next_states):
+                        if active_envs[i]:
+                            states[i] = next_state
 
                     # Train agent
                     self.agent.train(self.batch_size)
+                    step_count += 1
 
-                    # Update states
-                    states = next_states
-
-                    # Break if all environments are done
                     if not any(active_envs):
                         break
 
-                # Track and plot rewards
+                # Update metrics
                 mean_reward = np.mean(episode_rewards)
                 self.rewards_history.append(mean_reward)
-                print(
-                    f"Episode {episode + 1}/{self.episodes}, Rewards: {episode_rewards}")
 
-                # Update dashboard with all metrics
+                if episode % 10 == 0:  # Log less frequently
+                    print(f"Episode {episode + 1}/{self.episodes}, " +
+                          f"Mean Reward: {mean_reward:.3f}, " +
+                          f"Steps: {step_count}")
+
                 self.dashboard.update(
                     self.rewards_history,
                     self.agent.replay_buffer,
@@ -93,15 +105,9 @@ class TrainingPipeline:
                     episode_dones
                 )
 
-            # Finalize plots
-            plt.ioff()
-            plt.show()
-
         except Exception as e:
             print(f"Error during training: {e}")
             raise
-
         finally:
-            # Ensure proper cleanup
             self.envs.close()
             self.dashboard.close()

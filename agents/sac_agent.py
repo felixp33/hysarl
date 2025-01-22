@@ -203,10 +203,6 @@ class SACAgent:
         actions = torch.FloatTensor(actions).to(self.device)
         rewards = torch.FloatTensor(rewards).unsqueeze(1).to(self.device)
 
-        # Add reward scaling RIGHT HERE, after converting rewards to tensor but before using them
-        reward_scale = 0.1
-        rewards = rewards * reward_scale
-
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
 

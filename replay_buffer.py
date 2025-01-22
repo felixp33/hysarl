@@ -102,6 +102,7 @@ class ReplayBuffer:
             Tuple of (states, actions, rewards, next_states, dones, env_ids)
         """
         batch = random.sample(self.buffer, batch_size)
+        print('batch: ', batch)
         return self._prepare_batch(batch)
 
     def stratified_sampling(self,

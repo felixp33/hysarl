@@ -31,31 +31,39 @@ class EnvironmentWorker(Process):
         self.env_id = env_id
 
     def run(self):
-        # Dynamically load engine
-        print(self.env_name, self.engine)
         try:
             env = gym.make(env_specs[self.env_name]['engines'][self.engine])
-        except KeyError:
-            raise ValueError(f"Unsupported environment: {self.env_name}")
+            state, _ = env.reset()
 
-        state, _ = env.reset()
-        while True:
-            cmd, data = self.conn.recv()
-            if cmd == 'step':
-                next_state, reward, terminated, truncated, _ = env.step(data)
-                done = terminated or truncated
-                print(
-                    f"Worker {self.env_id}: State={state}, Action={data}, Reward={reward}, Next State={next_state}, Done={done}")
-                if done:
-                    next_state, _ = env.reset()
-                self.conn.send((next_state, reward, done, self.env_id))
-            elif cmd == 'reset':
-                state, _ = env.reset()
-                self.conn.send(state)
-            elif cmd == 'close':
-                env.close()
-                self.conn.close()
-                break
+            while True:
+                cmd, data = self.conn.recv()
+
+                if cmd == 'step':
+                    # Take step
+                    next_state, reward, terminated, truncated, _ = env.step(
+                        data)
+                    done = terminated or truncated
+
+                    # Reset if done
+                    if done:
+                        next_state, _ = env.reset()
+
+                    self.conn.send((next_state, reward, done, self.env_id))
+                    state = next_state  # Update state
+
+                elif cmd == 'reset':
+                    state, _ = env.reset()
+                    self.conn.send(state)
+
+                elif cmd == 'close':
+                    env.close()
+                    self.conn.close()
+                    break
+
+        except Exception as e:
+            print(f"Error in worker {self.env_id}: {e}")
+            self.conn.close()
+            raise
 
 
 class EnvironmentOrchestrator:
@@ -64,7 +72,9 @@ class EnvironmentOrchestrator:
         self.engines = engines
         self.workers = []
         self.conns = []
+        self.active_envs = [True] * len(engines)
 
+        # Initialize workers and connections
         for i, engine in enumerate(engines):
             parent_conn, child_conn = Pipe()
             worker = EnvironmentWorker(env_name, engine, child_conn, env_id=i)
@@ -73,23 +83,71 @@ class EnvironmentOrchestrator:
             self.conns.append(parent_conn)
 
     def step(self, actions):
-        for conn, action in zip(self.conns, actions):
-            conn.send(('step', action))
-        results = [conn.recv() for conn in self.conns]
-        states, rewards, dones, env_ids = zip(*results)
-        print(
-            f"Main: Actions={actions}, States={states}, Rewards={rewards}, Dones={dones}, Env_IDs={env_ids}")
-        return states, rewards, dones, env_ids
+        try:
+            # Only step active environments
+            results = []
+            for i, (conn, action) in enumerate(zip(self.conns, actions)):
+                if self.active_envs[i] and action is not None:
+                    conn.send(('step', action))
+                    result = conn.recv()
+                    results.append(result)
+
+                    # Update environment status based on done flag
+                    _, _, done, _ = result
+                    if done:
+                        self.active_envs[i] = False
+
+            if not results:  # Handle case where no environments are active
+                return [], [], [], []
+
+            # Unzip results
+            states, rewards, dones, env_ids = zip(*results)
+            return states, rewards, dones, env_ids
+
+        except Exception as e:
+            print(f"Error in environment step: {e}")
+            self.close()
+            raise
 
     def reset(self):
-        for conn in self.conns:
-            conn.send(('reset', None))
-        states = [conn.recv() for conn in self.conns]
-        print(f"Main: Reset States={states}")
-        return states
+        try:
+            # Reset active environment tracking
+            self.active_envs = [True] * len(self.engines)
+
+            # Reset all environments
+            for conn in self.conns:
+                conn.send(('reset', None))
+
+            # Collect initial states
+            states = [conn.recv() for conn in self.conns]
+            return states
+
+        except Exception as e:
+            print(f"Error in environment reset: {e}")
+            self.close()
+            raise
 
     def close(self):
-        for conn in self.conns:
-            conn.send(('close', None))
-        for worker in self.workers:
-            worker.join()
+        try:
+            # Close all workers
+            for conn in self.conns:
+                if conn.poll():  # Clear any pending messages
+                    _ = conn.recv()
+                conn.send(('close', None))
+
+            # Join workers with timeout
+            for worker in self.workers:
+                worker.join(timeout=1.0)
+                if worker.is_alive():
+                    worker.terminate()
+
+            # Close all connections
+            for conn in self.conns:
+                conn.close()
+
+        except Exception as e:
+            print(f"Error during environment cleanup: {e}")
+            # Force terminate any remaining workers
+            for worker in self.workers:
+                if worker.is_alive():
+                    worker.terminate()
