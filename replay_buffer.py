@@ -13,19 +13,24 @@ class ReplayBuffer:
     def push(self, state, action, reward, next_state, done, env_id):
         # Add experience to the buffer
         if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.position] = (
-            state, action, reward, next_state, done, env_id)
-        self.position = (self.position + 1) % self.capacity
+            self.buffer.append(
+                (state, action, reward, next_state, done, env_id))
+        else:
+            self.buffer[self.position] = (
+                state, action, reward, next_state, done, env_id)
+        self.position = (self.position + 1) % self.capacity  # Cyclic buffer
 
     def sample(self, batch_size, composition=None):
+        if batch_size > len(self.buffer):
+            batch_size = len(self.buffer)  # Prevent sampling errors
+
         if self.strategy == 'uniform':
             return self.uniform_sampling(batch_size)
         elif self.strategy == 'stratified':
             if composition is None:
                 raise ValueError(
-                    "Stratified sampling requires composition dictionary.")
-            return self.stratified_sampling(batch_size, )
+                    "Stratified sampling requires a composition dictionary.")
+            return self.stratified_sampling(batch_size, composition)
 
     def uniform_sampling(self, batch_size):
         # Uniform sampling
@@ -65,7 +70,8 @@ class ReplayBuffer:
         # Continue sampling from all available experiences to fill the remaining batch size
         remaining_samples = batch_size - len(samples)
         if remaining_samples > 0:
-            additional_samples = random.sample(self.buffer, remaining_samples)
+            additional_samples = random.choices(
+                self.buffer, k=remaining_samples)  # Avoid sampling errors
             samples.extend(additional_samples)
 
         # Unpack the samples into separate arrays
@@ -86,3 +92,10 @@ class ReplayBuffer:
                 env_id_counts[env_id] = 0
             env_id_counts[env_id] += 1
         return env_id_counts
+
+    def clear(self):
+        """
+        Clears the replay buffer.
+        """
+        self.buffer = []
+        self.position = 0
