@@ -3,7 +3,9 @@ from multiprocessing import Process, Pipe
 
 # Dictionary to store state and action dimensions for different environments
 env_specs = {
-    'CartPole-v1': {'state_dim': 4, 'action_dim': 2, 'engines': {'gym': 'CartPole-v1'}},
+    'CartPole-v1': {'state_dim': 4, 'action_dim': 2, 'engines': {'gym': 'CartPole-v1',
+                                                                 'mujoco': 'CartPole-v1',
+                                                                 'pybullet': 'CartPole-v1'}},
     'LunarLander-v2': {'state_dim': 8, 'action_dim': 4},
     'HalfCheetah-v4': {'state_dim': 17, 'action_dim': 6},
     'Ant-v4': {'state_dim': 111, 'action_dim': 8},

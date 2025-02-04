@@ -161,6 +161,19 @@ class ReplayBuffer:
 
         return self._prepare_batch(samples)
 
+    def decay_by_episode(self, decay_by_episode) -> Tuple:
+        """varies sampling composition by episode
+            - decrease sampling of low quality by fixed rate
+            - decrease sampling of low quality to reach 100% by fixed episode
+        """
+        pass
+
+    def progress_decay_avoidence(self, decay_by_episode) -> Tuple:
+        """
+        - decrease sampling in low quality if 
+        """
+        pass
+
     def _prepare_batch(self, batch: List[Tuple]) -> Tuple:
         """Convert a list of experiences into a batch of arrays.
 

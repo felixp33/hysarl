@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from replay_buffer import ReplayBuffer
-from agents.dqn_agent import DQNAgent
+from agents.dqn_cont_agent import DQNAgentCont
+from agents.sac_agent import SACAgent
+from agents.dqn_disc_agent import DQNAgentDisc
 from environment import EnvironmentOrchestrator
 
 import numpy as np
@@ -76,6 +78,10 @@ class TrainingPipeline:
                             if dones[i]:
                                 episode_dones[env_id] = True
                                 active_envs[env_id] = False
+                                # Instead of a single reset, get a new state from a full reset
+                                temp_states = self.envs.reset()
+                                # Update just the done environment's state
+                                states[env_id] = temp_states[env_id]
 
                     # Update states only for active environments
                     for i, next_state in zip(env_ids, next_states):
