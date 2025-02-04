@@ -4,38 +4,53 @@ import matplotlib.pyplot as plt
 
 class Dashboard:
     def __init__(self, num_envs, params):
-        # Initialize 2x3 grid layout
         self.fig, self.axes = plt.subplots(2, 3, figsize=(18, 10))
         plt.ion()
 
-        # Display parameters at the top
-        self.fig.suptitle(self.format_params(params), fontsize=10)
+        # Format parameters in multiple columns and display at the top
+        param_text = self.format_params_multicolumn(params, num_columns=3)
+        self.fig.suptitle(param_text, fontsize=10)
 
-        # Track histories
         self.done_history = {env_id: [] for env_id in range(num_envs)}
         self.samples_history = {env_id: [] for env_id in range(num_envs)}
         self.buffer_composition_history = {
             env_id: [] for env_id in range(num_envs)}
+        self.buffer_fullness_history = []  # Track buffer fullness
         self.episodes = []
 
-        # Moving average windows
         self.short_window = 10
         self.long_window = 100
 
-    def format_params(self, params):
-        """Formats parameters into a readable string."""
-        return '\n'.join([f"{key}: {value}" for key, value in params.items()])
+    def format_params_multicolumn(self, params, num_columns=3):
+        """Formats parameters into multiple columns."""
+        # Convert params into list of key-value pairs
+        param_list = [f"{key} {value}" for key, value in params.items()]
+
+        # Calculate rows needed
+        num_params = len(param_list)
+        num_rows = (num_params + num_columns - 1) // num_columns
+
+        # Pad the list to fill all columns
+        while len(param_list) < num_rows * num_columns:
+            param_list.append('')
+
+        # Create columns
+        columns = []
+        for col in range(num_columns):
+            column = param_list[col::num_columns]
+            columns.append('\n'.join(column))
+
+        # Join columns with spacing
+        return '     |     '.join(columns)
 
     def calculate_moving_average(self, data, window_size):
-        """Calculates the moving average of the rewards."""
         if len(data) < window_size:
             return np.array(data)
         weights = np.ones(window_size) / window_size
         return np.convolve(data, weights, mode='valid')
 
     def plot_rewards(self, rewards_history):
-        """Plots the reward progression and moving averages."""
-        ax = self.axes[0, 0]  # Top-left
+        ax = self.axes[0, 0]
         ax.cla()
 
         ax.plot(rewards_history, label='Raw Reward', alpha=0.3, color='gray')
@@ -64,29 +79,29 @@ class Dashboard:
         ax.legend()
         ax.grid(True)
 
-    def plot_sampling_distribution(self):
-        """Plots the evolution of sampling distribution over episodes."""
-        ax = self.axes[0, 1]  # Top-middle
+    def plot_sampling_composition(self):
+        """Plots the evolution of sampling composition over episodes."""
+        ax = self.axes[0, 1]
         ax.cla()
 
+        # Plot sampling composition
         for env_id, samples in self.samples_history.items():
             if samples:
                 total_samples = np.array(
                     [sum(s) for s in zip(*self.samples_history.values())])
                 sample_percentages = np.array(samples) / total_samples * 100
                 ax.plot(self.episodes, sample_percentages,
-                        label=f'Env {env_id}', linewidth=2)
+                        label=f'Env {env_id}', linewidth=3)
 
         ax.set_xlabel('Episode')
         ax.set_ylabel('Samples (%)')
-        ax.set_title('Sampling Distribution Over Time')
+        ax.set_title('Sampling Composition Over Time')
         ax.legend()
         ax.grid(True)
         ax.set_ylim([0, 100])
 
     def plot_done_ratio(self):
-        """Plots the ratio of dones per episode per environment."""
-        ax = self.axes[0, 2]  # Top-right
+        ax = self.axes[0, 2]
         ax.cla()
 
         for env_id, dones in self.done_history.items():
@@ -104,8 +119,7 @@ class Dashboard:
         ax.set_ylim([0, 1])
 
     def plot_episode_samples(self):
-        """Plots the absolute number of samples per episode."""
-        ax = self.axes[1, 0]  # Bottom-left
+        ax = self.axes[1, 0]
         ax.cla()
 
         for env_id, samples in self.samples_history.items():
@@ -120,25 +134,49 @@ class Dashboard:
         ax.grid(True)
 
     def plot_buffer_composition(self):
-        """Plots the buffer composition over time."""
-        ax = self.axes[1, 1]  # Bottom-middle
+        """Plots the buffer composition over time with detailed buffer fullness."""
+        ax = self.axes[1, 1]
         ax.cla()
 
+        # Create secondary y-axis for buffer fullness
+        ax2 = ax.twinx()
+
+        # Plot buffer composition on primary y-axis
         for env_id, composition in self.buffer_composition_history.items():
             if composition:
                 ax.plot(self.episodes, composition,
-                        label=f'Env {env_id}', linewidth=2)
+                        label=f'Env {env_id}', linewidth=3)
+
+        # Plot buffer fullness on secondary y-axis
+        if self.buffer_fullness_history:
+            current_fullness = self.buffer_fullness_history[-1]
+            # Get the absolute number from the replay buffer statistics
+            stats = self.last_buffer_stats  # Stored during update
+            current_size = stats['size']
+            total_capacity = stats['capacity']
+
+            fullness_label = f'Buffer Fullness: {current_fullness:.1f}% ({current_size:,}/{total_capacity:,})'
+
+            ax2.plot(self.episodes, self.buffer_fullness_history,
+                     label=fullness_label,
+                     color='black', linestyle='--', linewidth=2)
 
         ax.set_xlabel('Episode')
         ax.set_ylabel('Buffer Composition (%)')
+        ax2.set_ylabel('Buffer Fullness (%)')
         ax.set_title('Replay Buffer Composition Over Time')
-        ax.legend()
+
+        # Adjust legends - combine both axes
+        lines1, labels1 = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
         ax.grid(True)
         ax.set_ylim([0, 100])
+        ax2.set_ylim([0, 100])
 
     def plot_buffer_absolute_counts(self):
-        """Plots the absolute number of samples in buffer per environment."""
-        ax = self.axes[1, 2]  # Bottom-right
+        ax = self.axes[1, 2]
         ax.cla()
 
         env_id_counts = {}
@@ -158,18 +196,20 @@ class Dashboard:
 
     def update(self, rewards_history, replay_buffer, episode, dones=None):
         """Updates all dashboard plots."""
-        # Update done history
         if dones is not None:
             for env_id in self.done_history:
                 self.done_history[env_id].append(
                     1 if dones.get(env_id, False) else 0)
 
-        # Update samples history and buffer composition
         env_id_counts = replay_buffer.get_env_id_distribution()
         total_samples = sum(env_id_counts.values())
 
+        # Store buffer statistics for use in plotting
+        self.last_buffer_stats = replay_buffer.get_statistics()
+        self.buffer_fullness_history.append(
+            self.last_buffer_stats['fullness'] * 100)  # Convert to percentage
+
         for env_id in self.samples_history:
-            # Update samples history
             count = env_id_counts.get(env_id, 0)
             if not self.samples_history[env_id]:
                 self.samples_history[env_id].append(count)
@@ -178,7 +218,6 @@ class Dashboard:
                 new_samples = count - prev_count
                 self.samples_history[env_id].append(new_samples)
 
-            # Update buffer composition history
             composition_percentage = (
                 count / total_samples * 100) if total_samples > 0 else 0
             self.buffer_composition_history[env_id].append(
@@ -188,7 +227,7 @@ class Dashboard:
 
         # Update all plots
         self.plot_rewards(rewards_history)
-        self.plot_sampling_distribution()
+        self.plot_sampling_composition()
         self.plot_done_ratio()
         self.plot_episode_samples()
         self.plot_buffer_composition()
@@ -198,6 +237,5 @@ class Dashboard:
         plt.pause(0.01)
 
     def close(self):
-        """Closes the dashboard."""
         plt.ioff()
         plt.show()
