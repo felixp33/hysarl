@@ -12,8 +12,9 @@ class Dashboard:
 
         # Get engine info from parameters.
         self.engines_dict = params['Engines']
-        # Instead of resetting the index per engine, we use a global counter
-        # so that the keys match the identifiers used by the EnvironmentOrchestrator.
+        # Build a list of keys that match the environment identifiers used by the orchestrator.
+        # (For example, if you have {'gym': 2, 'mujoco': 2} and a global counter,
+        # keys might be: "gym_0", "gym_1", "mujoco_2", "mujoco_3".)
         self.env_keys = []
         global_index = 0
         for engine, count in self.engines_dict.items():
@@ -23,7 +24,9 @@ class Dashboard:
 
         # Initialize histories using the actual keys.
         self.done_history = {key: [] for key in self.env_keys}
-        self.samples_history = {key: [] for key in self.env_keys}
+        self.samples_history = {key: []
+                                for key in self.env_keys}  # For sampling composition
+        # For overall buffer composition
         self.buffer_composition_history = {key: [] for key in self.env_keys}
 
         self.buffer_fullness_history = []
@@ -32,11 +35,15 @@ class Dashboard:
         self.long_window = 100
 
     def plot_sampling_composition(self):
+        """
+        Plots the sampling composition aggregated by engine type.
+        (This uses data from self.samples_history, which is updated from the replay buffer's sampling distribution.)
+        """
         ax = self.axes[0, 1]
         ax.cla()
 
         if any(self.samples_history.values()):
-            # Group samples by engine type
+            # Group sampled counts by engine type
             engine_samples = {engine: []
                               for engine in self.engines_dict.keys()}
             for env_id, samples in self.samples_history.items():
@@ -47,6 +54,7 @@ class Dashboard:
                     engine_samples[engine_type] = [sum(x) for x in zip(
                         engine_samples[engine_type], samples)]
 
+            # Compute total sampled counts per episode
             total_samples = np.array([sum(s)
                                      for s in zip(*engine_samples.values())])
             for engine_type, samples in engine_samples.items():
@@ -101,8 +109,13 @@ class Dashboard:
                 self.done_history[env_id].append(
                     1 if episode_dones.get(env_num, False) else 0)
 
+        # Get overall buffer composition distribution from the replay buffer.
         env_id_counts = replay_buffer.get_env_id_distribution()
-        total_samples = sum(env_id_counts.values())
+        total_buffer_samples = sum(env_id_counts.values())
+
+        # Get sampling distribution (i.e. how many times experiences have been drawn) from the replay buffer.
+        sampling_distribution = replay_buffer.get_sampling_distribution()
+        total_sampled = sum(sampling_distribution.values())
 
         self.last_buffer_stats = replay_buffer.get_statistics()
         self.buffer_fullness_history.append(
@@ -110,10 +123,13 @@ class Dashboard:
 
         # Update histories for each instance.
         for env_id in self.samples_history:
-            count = env_id_counts.get(env_id, 0)
-            self.samples_history[env_id].append(count)
+            # Update sampling history from the new sampling distribution.
+            count_sampled = sampling_distribution.get(env_id, 0)
+            self.samples_history[env_id].append(count_sampled)
+            # Update overall buffer composition history.
+            count_buffer = env_id_counts.get(env_id, 0)
             composition_percentage = (
-                count / total_samples * 100) if total_samples > 0 else 0
+                count_buffer / total_buffer_samples * 100) if total_buffer_samples > 0 else 0
             self.buffer_composition_history[env_id].append(
                 composition_percentage)
 
@@ -124,7 +140,7 @@ class Dashboard:
         self.plot_done_ratio()
         self.plot_episode_samples()
         self.plot_buffer_composition()
-        # New plot for instance-level distribution.
+        # Plot for instance-level distribution.
         self.plot_buffer_instance_distribution()
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -204,7 +220,7 @@ class Dashboard:
         ax = self.axes[1, 1]
         ax.cla()
         ax2 = ax.twinx()
-        # Aggregate buffer composition by engine type
+        # Aggregate buffer composition by engine type.
         engine_composition = {engine: []
                               for engine in self.engines_dict.keys()}
         for env_id, composition in self.buffer_composition_history.items():

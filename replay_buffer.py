@@ -1,6 +1,5 @@
 from typing import Dict, List, Tuple, Union, Optional
 import numpy as np
-from collections import deque
 import random
 
 
@@ -19,14 +18,8 @@ class ReplayBuffer:
         self.strategy = strategy
         self.composition = composition
 
-    def sample(self, batch_size: int) -> Tuple:
-        if batch_size > len(self.buffer):
-            raise ValueError(
-                f"Requested batch size {batch_size} is larger than buffer size {len(self.buffer)}")
-
-        if self.strategy == 'uniform':
-            return self.uniform_sampling(batch_size)
-        return self.stratified_sampling(batch_size)
+        # This dictionary will track how many times an experience from a given env_id is drawn.
+        self.sampled_counts: Dict[str, int] = {}
 
     def push(self,
              state: np.ndarray,
@@ -35,15 +28,8 @@ class ReplayBuffer:
              next_state: np.ndarray,
              done: bool,
              env_id: str) -> None:
-        """Add an experience to the buffer.
-
-        Args:
-            state: Current state observation
-            action: Action taken
-            reward: Reward received
-            next_state: Next state observation
-            done: Whether the episode ended
-            env_id: Environment identifier for stratified sampling
+        """
+        Add an experience to the buffer.
         """
         # Convert inputs to numpy arrays if they aren't already
         state = np.asarray(state)
@@ -61,23 +47,13 @@ class ReplayBuffer:
     def sample(self,
                batch_size: int,
                composition: Optional[Dict[str, float]] = None) -> Tuple:
-        """Sample a batch of experiences.
-
-        Args:
-            batch_size: Number of experiences to sample
-            composition: Dictionary mapping env_ids to sampling proportions
-                        Required for stratified sampling
-
-        Returns:
-            Tuple of (states, actions, rewards, next_states, dones, env_ids)
-
-        Raises:
-            ValueError: If batch_size > buffer size or if composition is missing
-                       for stratified sampling
+        """
+        Sample a batch of experiences.
         """
         if batch_size > len(self.buffer):
             raise ValueError(
-                f"Requested batch size {batch_size} is larger than buffer size {len(self.buffer)}")
+                f"Requested batch size {batch_size} is larger than buffer size {len(self.buffer)}"
+            )
 
         if self.strategy == 'uniform':
             return self.uniform_sampling(batch_size)
@@ -85,33 +61,31 @@ class ReplayBuffer:
             return self.stratified_sampling(batch_size)
 
     def uniform_sampling(self, batch_size: int) -> Tuple:
-        """Perform uniform sampling from the buffer.
-
-        Args:
-            batch_size: Number of experiences to sample
-
-        Returns:
-            Tuple of (states, actions, rewards, next_states, dones, env_ids)
+        """
+        Perform uniform sampling from the buffer.
         """
         batch = random.sample(self.buffer, batch_size)
+        self._update_sampled_counts(batch)
         return self._prepare_batch(batch)
 
     def stratified_sampling(self, batch_size: int) -> Tuple:
+        """
+        Perform stratified sampling from the buffer.
+        """
         samples = []
 
-        # Group experiences by engine type
+        # Group experiences by engine type (extracted from env_id)
         grouped = {}
         for exp in self.buffer:
-            # Extract engine type from env_id
             engine_type = exp[-1].split('_')[0]
             grouped.setdefault(engine_type, []).append(exp)
 
-        # Normalize proportions
+        # Normalize proportions based on the composition dictionary
         total = sum(self.composition.values())
         normalized_composition = {
-            k: v/total for k, v in self.composition.items()}
+            k: v / total for k, v in self.composition.items()}
 
-        # Sample from each group according to composition
+        # Sample from each group according to the desired composition
         for engine_type, proportion in normalized_composition.items():
             if engine_type in grouped:
                 n_samples = int(proportion * batch_size)
@@ -122,11 +96,14 @@ class ReplayBuffer:
                     )
                     samples.extend(group_samples)
 
-        # Fill remaining samples using uniform sampling from unused experiences
+        # Fill remaining samples using uniform sampling from experiences not yet selected
         remaining = batch_size - len(samples)
         if remaining > 0:
-            used_experiences = set(tuple(map(lambda x: x.tobytes() if isinstance(x, np.ndarray) else x, exp))
-                                   for exp in samples)
+            used_experiences = set(
+                tuple(map(lambda x: x.tobytes() if isinstance(
+                    x, np.ndarray) else x, exp))
+                for exp in samples
+            )
             available_experiences = [
                 exp for exp in self.buffer
                 if tuple(map(lambda x: x.tobytes() if isinstance(x, np.ndarray) else x, exp)) not in used_experiences
@@ -138,46 +115,39 @@ class ReplayBuffer:
                 )
                 samples.extend(remaining_samples)
 
+        self._update_sampled_counts(samples)
         return self._prepare_batch(samples)
 
-    def decay_by_episode(self, decay_by_episode) -> Tuple:
-        """varies sampling composition by episode
-            - decrease sampling of low quality by fixed rate
-            - decrease sampling of low quality to reach 100% by fixed episode
+    def _update_sampled_counts(self, batch: List[Tuple]) -> None:
         """
-        pass
+        Update the sampling counts based on the sampled experiences.
+        """
+        for exp in batch:
+            env_id = exp[-1]
+            self.sampled_counts[env_id] = self.sampled_counts.get(
+                env_id, 0) + 1
 
-    def progress_decay_avoidence(self, decay_by_episode) -> Tuple:
+    def get_sampling_distribution(self) -> Dict[str, int]:
         """
-        - decrease sampling in low quality if 
+        Get the distribution of sampled experiences across environment IDs.
         """
-        pass
+        return self.sampled_counts
 
     def _prepare_batch(self, batch: List[Tuple]) -> Tuple:
-        """Convert a list of experiences into a batch of arrays.
-
-        Args:
-            batch: List of experience tuples
-
-        Returns:
-            Tuple of numpy arrays for each component
+        """
+        Convert a list of experiences into a batch of arrays.
         """
         states, actions, rewards, next_states, dones, env_ids = zip(*batch)
-
-        # Convert to numpy arrays
         states = np.array(states)
         actions = np.array(actions)
         rewards = np.array(rewards, dtype=np.float32)
         next_states = np.array(next_states)
         dones = np.array(dones, dtype=np.bool_)
-
         return states, actions, rewards, next_states, dones, env_ids
 
     def get_env_id_distribution(self) -> Dict[str, int]:
-        """Get the distribution of experiences across environments.
-
-        Returns:
-            Dictionary mapping environment IDs to counts
+        """
+        Get the overall distribution of experiences stored in the buffer.
         """
         env_id_counts = {}
         for exp in self.buffer:
@@ -186,20 +156,13 @@ class ReplayBuffer:
         return env_id_counts
 
     def get_statistics(self) -> Dict[str, Union[float, int]]:
-        """Calculate basic statistics of the stored experiences.
-
-        Returns:
-            Dictionary containing buffer statistics
+        """
+        Calculate basic statistics of the stored experiences.
         """
         if not self.buffer:
-            return {
-                "size": 0,
-                "capacity": self.capacity,
-                "fullness": 0.0
-            }
+            return {"size": 0, "capacity": self.capacity, "fullness": 0.0}
 
         rewards = [exp[2] for exp in self.buffer]
-
         return {
             "size": len(self.buffer),
             "capacity": self.capacity,
@@ -215,7 +178,8 @@ class ReplayBuffer:
         """Clear all experiences from the buffer."""
         self.buffer = []
         self.position = 0
+        self.sampled_counts = {}  # Reset sampled counts as well
 
     def __len__(self) -> int:
-        """Get the current size of the buffer."""
+        """Return the current size of the buffer."""
         return len(self.buffer)

@@ -10,7 +10,7 @@ if __name__ == "__main__":
     env_name = 'CartPole-v1'
     # List of engines to test, gym = classic conrol/simple
     engines = engines = {'gym': 3, 'mujoco': 2}
-    buffer_capacity = 2000
+    buffer_capacity = 10000
     batch_size = 256
     episodes = 1000
     steps_per_episode = 500
