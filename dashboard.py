@@ -12,9 +12,7 @@ class Dashboard:
 
         # Get engine info from parameters.
         self.engines_dict = params['Engines']
-        # Build a list of keys that match the environment identifiers used by the orchestrator.
-        # (For example, if you have {'gym': 2, 'mujoco': 2} and a global counter,
-        # keys might be: "gym_0", "gym_1", "mujoco_2", "mujoco_3".)
+
         self.env_keys = []
         global_index = 0
         for engine, count in self.engines_dict.items():

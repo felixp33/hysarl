@@ -14,9 +14,9 @@ if __name__ == "__main__":
     batch_size = 256
     episodes = 1000
     steps_per_episode = 500
-    sampling_strategies = ['uniform', 'stratified']  # uniform, stratified, ...
+    sampling_strategies = ['uniform', 'stratified', 'stratified_shift']
     sampling_composition = {'gym': 0.3, 'mujoco': 0.7}
-    buffer_compositon_type = 'stratified'  # standard, stratified, ...
+    buffer_compositon_type = ['uniform', 'stratified', '_']
     buffer_composition = {'gym': 0.3, 'mujoco': 0.7}
 
     # Fetch dimensions from environment specs
@@ -26,9 +26,11 @@ if __name__ == "__main__":
     # Initialize replay buffer and agent
     replay_buffer = ReplayBuffer(
         capacity=buffer_capacity, strategy=sampling_strategies[1], composition=sampling_composition)
+    replay_buffer_shift = ReplayBuffer(
+        capacity=buffer_capacity, strategy=sampling_strategies[2], composition=buffer_composition, start_composition={'gym': 0.8, 'mujoco': 0.2}, goal_composition={'gym': 0.2, 'mujoco': 0.8}, episode_goal_reached=200)
     sac_agent = SACAgent(state_dim, action_dim, replay_buffer,
                          hidden_dim=128, lr=1e-4, alpha=0.2, warmup_steps=10000)
-    dqn_agent = DQNAgentDisc(state_dim, action_dim, replay_buffer,
+    dqn_agent = DQNAgentDisc(state_dim, action_dim, replay_buffer_shift,
                              lr=1e-4, gamma=0.99, epsilon_decay=1e-3)
     # Create and run training pipeline
     pipeline = TrainingPipeline(

@@ -44,7 +44,7 @@ class EnvironmentWorker(Process):
 
             while True:
                 cmd, data = self.conn.recv()
-                print(f"Worker {self.env_id} received {cmd} with data {data}")
+              #  print(f"Worker {self.env_id} received {cmd} with data {data}")
 
                 if cmd == 'step':
                     next_state, reward, terminated, truncated, _ = env.step(

@@ -92,7 +92,6 @@ class TrainingPipeline:
                         for state, active, steps in zip(states, active_envs, env_steps)
                     ]
                     try:
-                        print("Actions:", len(actions))
                         next_states, rewards, dones, env_ids = self.envs.step(
                             actions)
                     except ValueError as e:
@@ -102,8 +101,6 @@ class TrainingPipeline:
 
                     # Convert env_ids (e.g. "gym_0") to integer indices
                     env_indices = [convert_env_id(eid) for eid in env_ids]
-                    print("Received env_ids:", env_ids)
-                    print("Converted env_indices:", env_indices)
 
                     for i, env_idx in enumerate(env_indices):
                         if active_envs[env_idx] and env_steps[env_idx] < self.steps_per_episode:
@@ -113,7 +110,8 @@ class TrainingPipeline:
                                 rewards[i],
                                 next_states[i],
                                 dones[i],
-                                env_ids[i]  # original identifier string
+                                env_ids[i],
+                                episode
                             )
                             episode_rewards[env_idx] += rewards[i]
                             env_steps[env_idx] += 1

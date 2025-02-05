@@ -1,2 +1,2 @@
 implement new sampling stratgies, 
-
+- based on progress, if progress slows down, increase high quality
