@@ -5,33 +5,28 @@ import random
 
 
 class ReplayBuffer:
-    """A replay buffer for reinforcement learning with support for uniform and stratified sampling.
-
-    Attributes:
-        capacity (int): Maximum number of experiences to store
-        strategy (str): Sampling strategy ('uniform' or 'stratified')
-        buffer (list): Storage for experiences
-        position (int): Current position in the buffer
-    """
-
-    def __init__(self, capacity: int, strategy: str = 'uniform'):
-        """Initialize the replay buffer.
-
-        Args:
-            capacity: Maximum number of experiences to store
-            strategy: Sampling strategy ('uniform' or 'stratified')
-
-        Raises:
-            ValueError: If strategy is not 'uniform' or 'stratified'
-        """
+    def __init__(self, capacity: int, strategy: str = 'uniform', composition: Optional[Dict[str, float]] = None):
         if strategy not in ['uniform', 'stratified']:
+            raise ValueError("Strategy must be in ['uniform', 'stratified']")
+
+        if strategy == 'stratified' and composition is None:
             raise ValueError(
-                "Strategy must be either 'uniform' or 'stratified'")
+                "Stratified sampling requires a composition dictionary")
 
         self.capacity = capacity
         self.buffer: List[Tuple] = []
         self.position = 0
         self.strategy = strategy
+        self.composition = composition
+
+    def sample(self, batch_size: int) -> Tuple:
+        if batch_size > len(self.buffer):
+            raise ValueError(
+                f"Requested batch size {batch_size} is larger than buffer size {len(self.buffer)}")
+
+        if self.strategy == 'uniform':
+            return self.uniform_sampling(batch_size)
+        return self.stratified_sampling(batch_size)
 
     def push(self,
              state: np.ndarray,
@@ -87,10 +82,7 @@ class ReplayBuffer:
         if self.strategy == 'uniform':
             return self.uniform_sampling(batch_size)
         elif self.strategy == 'stratified':
-            if composition is None:
-                raise ValueError(
-                    "Stratified sampling requires a composition dictionary")
-            return self.stratified_sampling(batch_size, composition)
+            return self.stratified_sampling(batch_size)
 
     def uniform_sampling(self, batch_size: int) -> Tuple:
         """Perform uniform sampling from the buffer.
@@ -102,56 +94,43 @@ class ReplayBuffer:
             Tuple of (states, actions, rewards, next_states, dones, env_ids)
         """
         batch = random.sample(self.buffer, batch_size)
-        print('batch: ', batch)
         return self._prepare_batch(batch)
 
-    def stratified_sampling(self,
-                            batch_size: int,
-                            composition: Dict[str, float]) -> Tuple:
-        """Perform stratified sampling based on environment proportions.
-
-        Args:
-            batch_size: Number of experiences to sample
-            composition: Dictionary mapping env_ids to sampling proportions
-
-        Returns:
-            Tuple of (states, actions, rewards, next_states, dones, env_ids)
-
-        Raises:
-            ValueError: If composition contains negative values
-        """
-        if any(prop < 0 for prop in composition.values()):
-            raise ValueError("Composition proportions must be non-negative")
-
+    def stratified_sampling(self, batch_size: int) -> Tuple:
         samples = []
 
-        # Normalize proportions
-        total = sum(composition.values())
-        normalized_composition = {k: v/total for k, v in composition.items()}
-
-        # Group experiences by environment ID
+        # Group experiences by engine type
         grouped = {}
         for exp in self.buffer:
-            env_id = exp[-1]
-            grouped.setdefault(env_id, []).append(exp)
+            # Extract engine type from env_id
+            engine_type = exp[-1].split('_')[0]
+            grouped.setdefault(engine_type, []).append(exp)
+
+        # Normalize proportions
+        total = sum(self.composition.values())
+        normalized_composition = {
+            k: v/total for k, v in self.composition.items()}
 
         # Sample from each group according to composition
-        for env_id, proportion in normalized_composition.items():
-            if env_id in grouped:
+        for engine_type, proportion in normalized_composition.items():
+            if engine_type in grouped:
                 n_samples = int(proportion * batch_size)
-                if n_samples > 0:  # Only sample if we need at least one sample
+                if n_samples > 0:
                     group_samples = random.sample(
-                        grouped[env_id],
-                        min(n_samples, len(grouped[env_id]))
+                        grouped[engine_type],
+                        min(n_samples, len(grouped[engine_type]))
                     )
                     samples.extend(group_samples)
 
         # Fill remaining samples using uniform sampling from unused experiences
         remaining = batch_size - len(samples)
         if remaining > 0:
-            used_experiences = set(samples)
+            used_experiences = set(tuple(map(lambda x: x.tobytes() if isinstance(x, np.ndarray) else x, exp))
+                                   for exp in samples)
             available_experiences = [
-                exp for exp in self.buffer if exp not in used_experiences]
+                exp for exp in self.buffer
+                if tuple(map(lambda x: x.tobytes() if isinstance(x, np.ndarray) else x, exp)) not in used_experiences
+            ]
             if available_experiences:
                 remaining_samples = random.sample(
                     available_experiences,

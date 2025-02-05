@@ -6,19 +6,18 @@ from agents.dqn_cont_agent import DQNAgentCont
 from agents.dqn_disc_agent import DQNAgentDisc
 
 if __name__ == "__main__":
-    # Parameters
     # CartPole-v1, Pendulum-v1, LunarLander-v2,MountainCarContinuous-v0
     env_name = 'CartPole-v1'
     # List of engines to test, gym = classic conrol/simple
-    engines = ['gym']
-    buffer_capacity = 100000
+    engines = engines = {'gym': 3, 'mujoco': 2}
+    buffer_capacity = 2000
     batch_size = 256
     episodes = 1000
     steps_per_episode = 500
-    sampling_strategy = 'uniform'  # stratified, ...
-
-    buffer_compositon_type = 'standard'  # standard, fixed, ...
-    buffer_compositon = [0.4, 0.4, 0.2]  # only if buffer is fixed
+    sampling_strategies = ['uniform', 'stratified']  # uniform, stratified, ...
+    sampling_composition = {'gym': 0.3, 'mujoco': 0.7}
+    buffer_compositon_type = 'stratified'  # standard, stratified, ...
+    buffer_composition = {'gym': 0.3, 'mujoco': 0.7}
 
     # Fetch dimensions from environment specs
     state_dim = env_specs[env_name]['state_dim']
@@ -26,7 +25,7 @@ if __name__ == "__main__":
 
     # Initialize replay buffer and agent
     replay_buffer = ReplayBuffer(
-        capacity=buffer_capacity, strategy=sampling_strategy)
+        capacity=buffer_capacity, strategy=sampling_strategies[1], composition=sampling_composition)
     sac_agent = SACAgent(state_dim, action_dim, replay_buffer,
                          hidden_dim=128, lr=1e-4, alpha=0.2, warmup_steps=10000)
     dqn_agent = DQNAgentDisc(state_dim, action_dim, replay_buffer,
