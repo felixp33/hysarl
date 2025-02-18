@@ -4,11 +4,16 @@ import random
 
 
 class ReplayBuffer:
-    def __init__(self, capacity: int, strategy: str = 'uniform', composition: Optional[Dict[str, float]] = None, start_composition: Optional[Dict[str, float]] = None, goal_composition: Optional[Dict[str, float]] = None, episode_goal_reached=100):
-        if strategy not in ['uniform', 'stratified']:
-            raise ValueError("Strategy must be in ['uniform', 'stratified']")
+    def __init__(self, capacity: int, strategy: str = 'uniform',
+                 sampling_composition: Optional[Dict[str, float]] = None,
+                 buffer_composition: Optional[Dict[str, float]] = None,
+                 ):
 
-        if strategy == 'stratified' and composition is None:
+        if strategy not in ['uniform', 'stratified', 'stratified_shift']:
+            raise ValueError(
+                "Strategy must be in ['uniform', 'stratified', 'stratified_shift']")
+
+        if strategy == 'stratified' and sampling_composition is None:
             raise ValueError(
                 "Stratified sampling requires a composition dictionary")
 
@@ -16,8 +21,8 @@ class ReplayBuffer:
         self.buffer: List[Tuple] = []
         self.position = 0
         self.strategy = strategy
-        self.composition = composition
-        self.goal_composition = goal_composition
+        self.sampling_composition = sampling_composition
+        self.buffer_composition = buffer_composition
 
         # This dictionary will track how many times an experience from a given env_id is drawn.
         self.sampled_counts: Dict[str, int] = {}
@@ -40,6 +45,7 @@ class ReplayBuffer:
         action = np.asarray(action)
 
         experience = (state, action, reward, next_state, done, env_id)
+        print(experience)
 
         if len(self.buffer) < self.capacity:
             self.buffer.append(experience)
@@ -86,9 +92,9 @@ class ReplayBuffer:
             grouped.setdefault(engine_type, []).append(exp)
 
         # Normalize proportions based on the composition dictionary
-        total = sum(self.composition.values())
+        total = sum(self.sampling_composition.values())
         normalized_composition = {
-            k: v / total for k, v in self.composition.items()}
+            k: v / total for k, v in self.sampling_composition.items()}
 
         # Sample from each group according to the desired composition
         for engine_type, proportion in normalized_composition.items():
@@ -122,34 +128,6 @@ class ReplayBuffer:
 
         self._update_sampled_counts(samples)
         return self._prepare_batch(samples)
-
-    def stratified_sampling_shift(self, batch_size: int) -> Tuple:
-        """
-        Perform stratified sampling with composition that shifts from start to goal over time.
-        """
-        if not (self.start_composition and self.goal_composition):
-            raise ValueError(
-                "Start and goal compositions must be provided for shift strategy")
-
-        # Calculate progress ratio (0 to 1)
-        progress = min(1.0, self.current_episode / self.episode_goal_reached)
-
-        # Interpolate between start and goal compositions
-        current_composition = {}
-        for env_type in self.start_composition.keys():
-            start_value = self.start_composition[env_type]
-            goal_value = self.goal_composition[env_type]
-            current_composition[env_type] = start_value + \
-                (goal_value - start_value) * progress
-
-        # Normalize the composition to ensure proportions sum to 1
-        total = sum(current_composition.values())
-        self.composition = {k: v/total for k, v in current_composition.items()}
-
-        print(
-            f"Episode {self.current_episode}: Using composition {self.composition}")
-
-        return self.stratified_sampling(batch_size)
 
     def _update_sampled_counts(self, batch: List[Tuple]) -> None:
         """

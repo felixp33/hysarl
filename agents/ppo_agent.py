@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions import Normal
+from torch.distributions import Categorical
 
 
 class PPOMemory:
@@ -32,11 +32,19 @@ class PPOMemory:
 
     def get_batch(self):
         return (torch.FloatTensor(self.states),
-                torch.FloatTensor(self.actions),
+                torch.LongTensor(self.actions),
                 torch.FloatTensor(self.log_probs),
                 torch.FloatTensor(self.rewards),
                 torch.FloatTensor(self.next_states),
                 torch.FloatTensor(self.dones))
+
+
+class ActionResult:
+    """Helper class to prevent action/log_prob confusion"""
+
+    def __init__(self, action, log_prob):
+        self.action = action
+        self.log_prob = log_prob
 
 
 class PPOAgent:
@@ -49,19 +57,17 @@ class PPOAgent:
         self.batch_size = batch_size
         self.epochs = epochs
         self.clip_grad = clip_grad
+        self.action_dim = action_dim  # Store action_dim for validation
 
-        # Actor network for continuous actions
+        # Actor network
         self.actor = nn.Sequential(
             nn.Linear(state_dim, 256),
             nn.ReLU(),
             nn.Linear(256, 256),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Linear(256, action_dim),
+            nn.Softmax(dim=-1)
         ).to(self.device)
-
-        # Separate mean and std outputs
-        self.actor_mean = nn.Linear(256, action_dim).to(self.device)
-        self.actor_log_std = nn.Parameter(
-            torch.zeros(1, action_dim)).to(self.device)
 
         # Critic network
         self.critic = nn.Sequential(
@@ -72,29 +78,35 @@ class PPOAgent:
             nn.Linear(256, 1)
         ).to(self.device)
 
-        # Optimizers
-        self.actor_optimizer = optim.Adam(list(self.actor.parameters()) +
-                                          [self.actor_log_std] +
-                                          list(self.actor_mean.parameters()), lr=lr)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr)
 
         self.memory = PPOMemory()
 
     def get_action_distribution(self, state):
-        actor_features = self.actor(state)
-        mean = self.actor_mean(actor_features)
-        std = self.actor_log_std.exp().expand_as(mean)
-        return Normal(mean, std)
+        action_probs = self.actor(state)
+        return Categorical(action_probs)
 
     def select_action(self, state):
+        """
+        Returns an ActionResult object to prevent confusion between action and log_prob
+        """
+        if not isinstance(state, np.ndarray):
+            state = np.array(state)
+
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+
         with torch.no_grad():
             dist = self.get_action_distribution(state)
             action = dist.sample()
-            log_prob = dist.log_prob(action).sum(dim=-1)
+            log_prob = dist.log_prob(action)
 
-        return (action.squeeze().cpu().numpy(),
-                log_prob.squeeze().cpu().numpy())
+        # Ensure action is a valid discrete action
+        action_value = action.item()
+        if not (0 <= action_value < self.action_dim):
+            raise ValueError(f"Invalid action value {action_value}")
+
+        return ActionResult(action_value, log_prob.item())
 
     def compute_advantages(self, rewards, values, dones):
         advantages = []
@@ -113,22 +125,20 @@ class PPOAgent:
             advantages.insert(0, last_advantage)
 
         advantages = torch.tensor(advantages, device=self.device)
-        # Normalize advantages
         advantages = (advantages - advantages.mean()) / \
             (advantages.std() + 1e-8)
         return advantages
 
     def train(self):
+        """Train the agent using collected experiences"""
         if len(self.memory.states) == 0:
             return
 
-        # Get batch data
         states, actions, old_log_probs, rewards, next_states, dones = self.memory.get_batch()
         states = states.to(self.device)
         actions = actions.to(self.device)
         old_log_probs = old_log_probs.to(self.device)
 
-        # Compute values and advantages
         with torch.no_grad():
             values = self.critic(states).squeeze()
             advantages = self.compute_advantages(
@@ -137,24 +147,21 @@ class PPOAgent:
             advantages = advantages.to(self.device)
             returns = returns.to(self.device)
 
-        # PPO update for specified number of epochs
         for _ in range(self.epochs):
-            # Get current action distributions
             dist = self.get_action_distribution(states)
-            new_log_probs = dist.log_prob(actions).sum(dim=-1)
+            new_log_probs = dist.log_prob(actions)
             entropy = dist.entropy().mean()
 
-            # Compute ratio and surrogate objectives
             ratio = torch.exp(new_log_probs - old_log_probs)
             surr1 = ratio * advantages
             surr2 = torch.clamp(ratio, 1 - self.epsilon,
                                 1 + self.epsilon) * advantages
             actor_loss = -torch.min(surr1, surr2).mean() - 0.01 * entropy
 
-            # Compute value loss with clipping
             current_values = self.critic(states).squeeze()
-            values_clipped = values + torch.clamp(current_values - values,
-                                                  -self.epsilon, self.epsilon)
+            values_clipped = values + \
+                torch.clamp(current_values - values, -
+                            self.epsilon, self.epsilon)
             critic_loss1 = (current_values - returns).pow(2)
             critic_loss2 = (values_clipped - returns).pow(2)
             critic_loss = 0.5 * torch.max(critic_loss1, critic_loss2).mean()
@@ -173,8 +180,18 @@ class PPOAgent:
                 self.critic.parameters(), self.clip_grad)
             self.critic_optimizer.step()
 
-        # Clear memory after updates
         self.memory.clear()
 
-    def store_experience(self, state, action, log_prob, reward, next_state, done):
-        self.memory.push(state, action, log_prob, reward, next_state, done)
+    def store_experience(self, state, action_result, reward, next_state, done):
+        """
+        Store a transition in memory
+        action_result should be an ActionResult object containing both action and log_prob
+        """
+        self.memory.push(
+            state,
+            action_result.action,
+            action_result.log_prob,
+            reward,
+            next_state,
+            done
+        )
