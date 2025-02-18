@@ -32,8 +32,47 @@ class TrainingStats:
         self.engine_indices = {engine: [] for engine in self.unique_engines}
         for i, engine in enumerate(self.engines):
             self.engine_indices[engine].append(i)
+
         self.instance_rewards = {i: [] for i in range(len(self.engines))}
         self.type_rewards = {engine: [] for engine in self.unique_engines}
+
+        # Track timing per instance instead of per engine type
+        self.instance_start_times = {i: None for i in range(len(self.engines))}
+        self.instance_step_times = {i: [] for i in range(len(self.engines))}
+        self.episode_durations = {engine: [] for engine in self.unique_engines}
+
+    def start_instance_timing(self, instance_idx):
+        """Start timing for a specific instance"""
+        self.instance_start_times[instance_idx] = time.time()
+
+    def end_instance_timing(self, instance_idx):
+        """End timing for a specific instance and record the duration"""
+        if self.instance_start_times[instance_idx] is not None:
+            duration = time.time() - self.instance_start_times[instance_idx]
+            self.instance_step_times[instance_idx].append(duration)
+            self.instance_start_times[instance_idx] = None
+
+    def compute_episode_durations(self):
+        """Compute average episode duration for each engine type"""
+        for engine_type in self.unique_engines:
+            indices = self.engine_indices[engine_type]
+            # Sum up all step times for instances of this engine type
+            engine_durations = []
+            for idx in indices:
+                # If there are any times recorded
+                if self.instance_step_times[idx]:
+                    total_duration = sum(self.instance_step_times[idx])
+                    engine_durations.append(total_duration)
+                    # Clear the step times for next episode
+                    self.instance_step_times[idx] = []
+
+            if engine_durations:  # If we have any durations for this engine
+                avg_duration = np.mean(engine_durations)
+                self.episode_durations[engine_type].append(avg_duration)
+            else:
+                # Append the last duration or 0 if no history
+                last_duration = self.episode_durations[engine_type][-1] if self.episode_durations[engine_type] else 0
+                self.episode_durations[engine_type].append(last_duration)
 
     def update_rewards(self, episode_rewards):
         for i, reward in enumerate(episode_rewards):
@@ -44,11 +83,16 @@ class TrainingStats:
             self.type_rewards[engine_type].append(type_reward)
 
     def get_stats(self):
-        return {'instance': self.instance_rewards, 'type': self.type_rewards}
+        return {
+            'instance': self.instance_rewards,
+            'type': self.type_rewards,
+            'episode_durations': self.episode_durations
+        }
 
 
 class TrainingPipeline:
     def __init__(self, env_name, engines_dict, buffer_capacity, batch_size, episodes, steps_per_episode, agent):
+        # Existing initialization code remains the same
         self.env_name = env_name
         self.engines_dict = engines_dict
         self.total_envs = sum(engines_dict.values())
@@ -61,6 +105,8 @@ class TrainingPipeline:
         self.rewards_history = []
         self.agent = agent
         self.stats = TrainingStats(engines_dict)
+
+        # Add sample age tracking to dashboard parameters
         self.dashboard = Dashboard(
             self.total_envs,
             {'Environment': env_name,
@@ -85,21 +131,26 @@ class TrainingPipeline:
 
                 while any(steps < self.steps_per_episode and active
                           for steps, active in zip(env_steps, active_envs)):
+                    # Start timing for active environments
+                    for env_idx, active in enumerate(active_envs):
+                        if active and env_steps[env_idx] < self.steps_per_episode:
+                            self.stats.start_instance_timing(env_idx)
+
                     actions = [
                         self.agent.select_action(state)
                         if active and steps < self.steps_per_episode
                         else None
                         for state, active, steps in zip(states, active_envs, env_steps)
                     ]
-                    try:
-                        next_states, rewards, dones, env_ids = self.envs.step(
-                            actions)
-                    except ValueError as e:
-                        if not any(active_envs):
-                            break
-                        raise
 
+                    next_states, rewards, dones, env_ids = self.envs.step(
+                        actions)
                     env_indices = [convert_env_id(eid) for eid in env_ids]
+
+                    # End timing for environments that just took a step
+                    for env_idx in env_indices:
+                        if active_envs[env_idx] and env_steps[env_idx] < self.steps_per_episode:
+                            self.stats.end_instance_timing(env_idx)
 
                     for i, env_idx in enumerate(env_indices):
                         if active_envs[env_idx] and env_steps[env_idx] < self.steps_per_episode:
@@ -127,20 +178,12 @@ class TrainingPipeline:
                     self.agent.train(self.batch_size)
                     global_step += 1
 
-                    if not any(steps < self.steps_per_episode and active
-                               for steps, active in zip(env_steps, active_envs)):
-                        break
+                # Compute average episode durations for each engine type
+                self.stats.compute_episode_durations()
 
                 mean_reward = np.mean(episode_rewards)
                 self.rewards_history.append(mean_reward)
                 self.stats.update_rewards(episode_rewards)
-                type_stats = self.stats.get_stats()['type']
-
-                if episode % 10 == 0:
-                    print(f"Episode {episode + 1}/{self.episodes}")
-                    for engine_type, rewards in type_stats.items():
-                        print(f"{engine_type} Mean Reward: {rewards[-1]:.3f}")
-                    print(f"Steps: {env_steps}")
 
                 self.dashboard.update(
                     self.rewards_history,
@@ -149,6 +192,16 @@ class TrainingPipeline:
                     episode_dones,
                     self.stats
                 )
+
+                if episode % 10 == 0:
+                    print(f"Episode {episode + 1}/{self.episodes}")
+                    for engine_type, rewards in self.stats.get_stats()['type'].items():
+                        print(f"{engine_type} Mean Reward: {rewards[-1]:.3f}")
+                        avg_duration = np.mean(
+                            self.stats.episode_durations[engine_type][-10:])
+                        print(f"{engine_type} Avg Duration: {avg_duration:.3f}s")
+                    print(f"Steps: {env_steps}")
+
         except Exception as e:
             print(f"Error during training: {e}")
             raise

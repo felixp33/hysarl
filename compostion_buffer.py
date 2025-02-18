@@ -53,9 +53,8 @@ class CompositionReplayBuffer:
 
         # Normalize buffer composition to ensure it sums to 1
         total = sum(self.buffer_composition.values())
-        self.buffer_composition = {
-            k: v/total for k, v in self.buffer_composition.items()
-        }
+        self.buffer_composition = {k: v/total for k,
+                                   v in self.buffer_composition.items()}
 
         print(f"Target buffer composition: {self.buffer_composition}")
 
@@ -109,7 +108,8 @@ class CompositionReplayBuffer:
                 f"Unknown engine type: {engine_type}. Must be one of {list(self.buffer_composition.keys())}")
 
         target_buffer = self.engine_buffers[engine_type]
-        experience = (state, action, reward, next_state, done, env_id)
+        experience = (state, action, reward, next_state,
+                      done, env_id, current_episode)
 
         # Check composition before adding
         current_comp = self.get_current_composition()
@@ -183,7 +183,10 @@ class CompositionReplayBuffer:
 
     def _prepare_batch(self, batch: List[Tuple]) -> Tuple:
         """Convert batch to numpy arrays efficiently."""
-        states, actions, rewards, next_states, dones, env_ids = zip(*batch)
+        # Unpack only the first 6 elements, ignoring the episode number
+        states, actions, rewards, next_states, dones, env_ids = zip(
+            *[(exp[0], exp[1], exp[2], exp[3], exp[4], exp[5]) for exp in batch])
+
         return (
             np.array(states),
             np.array(actions),
@@ -244,20 +247,37 @@ class CompositionReplayBuffer:
         return self.sampled_counts
 
     def get_statistics(self) -> Dict[str, Union[float, int, Dict]]:
-        """Get comprehensive buffer statistics."""
+        """Get comprehensive buffer statistics including correct sample ages."""
         if not any(len(buffer) > 0 for buffer in self.engine_buffers.values()):
             return {
                 "size": 0,
                 "capacity": self.capacity,
                 "fullness": 0.0,
                 "composition": self.get_current_composition(),
-                "sampling_distribution": self.sampled_counts
+                "sampling_distribution": self.sampled_counts,
+                "sample_ages": {engine: 0 for engine in self.engine_types}
             }
 
+        # Calculate average age per engine type
+        average_ages = {}
         all_rewards = []
-        for buffer in self.engine_buffers.values():
-            rewards = [exp[2] for exp in buffer]  # reward is at index 2
-            all_rewards.extend(rewards)
+
+        for engine_type, buffer in self.engine_buffers.items():
+            if len(buffer) > 0:
+                experiences = list(buffer)
+                rewards = [exp[2] for exp in experiences]
+                all_rewards.extend(rewards)
+
+                # Get episode numbers and calculate ages
+                episode_numbers = [exp[6] for exp in experiences]
+                if episode_numbers:
+                    mean_episode = float(np.mean(episode_numbers))
+                    age = self.current_episode - mean_episode
+                    average_ages[engine_type] = age
+                else:
+                    average_ages[engine_type] = 0.0
+            else:
+                average_ages[engine_type] = 0.0
 
         return {
             "size": len(self),
@@ -265,6 +285,7 @@ class CompositionReplayBuffer:
             "fullness": len(self) / self.capacity,
             "composition": self.get_current_composition(),
             "sampling_distribution": self.sampled_counts,
+            "sample_ages": average_ages,
             "reward_stats": {
                 "mean": float(np.mean(all_rewards)) if all_rewards else 0.0,
                 "std": float(np.std(all_rewards)) if all_rewards else 0.0,
