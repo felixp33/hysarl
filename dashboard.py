@@ -57,8 +57,11 @@ class Dashboard:
                                      for s in zip(*engine_samples.values())])
             for engine_type, samples in engine_samples.items():
                 if samples:
-                    sample_percentages = np.array(
-                        samples) / total_samples * 100
+                    sample_percentages = np.divide(samples, total_samples,
+                                                   out=np.zeros_like(
+                                                       samples, dtype=float),
+                                                   where=total_samples != 0) * 100
+
                     current_percentage = sample_percentages[-1] if len(
                         sample_percentages) > 0 else 0
                     ax.plot(self.episodes, sample_percentages,

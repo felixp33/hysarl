@@ -12,14 +12,14 @@ class CompositionReplayBuffer:
                  buffer_composition: Optional[Dict[str, float]] = None,
                  engine_counts: Optional[Dict[str, int]] = None):
         """
-        Initialize replay buffer with composition management and sampling options
+        Initialize buffer with strict composition enforcement
 
         Args:
             capacity: Total buffer capacity
             strategy: Sampling strategy ('uniform' or 'stratified')
             sampling_composition: Target percentages for stratified sampling
             buffer_composition: Target percentages for buffer storage
-            engine_counts: Dictionary mapping engine types to count (optional)
+            engine_counts: Dictionary mapping engine types to count
         """
         if strategy not in ['uniform', 'stratified']:
             raise ValueError(
@@ -32,104 +32,108 @@ class CompositionReplayBuffer:
         self.capacity = capacity
         self.strategy = strategy
         self.sampling_composition = sampling_composition
-
-        # Handle the case where engine_counts is not provided initially
         self.engine_counts = engine_counts if engine_counts is not None else {
             'gym': 1}
         self.engine_types = list(self.engine_counts.keys())
 
-        # Set buffer composition
-        if buffer_composition is None:
-            # Default to proportional by engine count
-            total_engines = sum(self.engine_counts.values())
-            self.buffer_composition = {
-                engine: count/total_engines
-                for engine, count in self.engine_counts.items()
-            }
-        else:
-            # Validate and normalize buffer composition
-            total = sum(buffer_composition.values())
-            if not np.isclose(total, 1.0):
-                raise ValueError("Buffer composition must sum to 1.0")
+        # Use provided buffer composition, DO NOT default to engine counts
+        if buffer_composition is not None:
             self.buffer_composition = buffer_composition
+        else:
+            if sampling_composition is not None:
+                # Use sampling composition as buffer composition if provided
+                self.buffer_composition = sampling_composition
+            else:
+                # Only use engine counts as last resort
+                total_engines = sum(self.engine_counts.values())
+                self.buffer_composition = {
+                    engine: count/total_engines
+                    for engine, count in self.engine_counts.items()
+                }
 
-        # Initialize buffers with capacities based on buffer composition
-        self.engine_buffers = {}
-        for engine_type in self.engine_types:
-            engine_capacity = int(
-                self.capacity * self.buffer_composition[engine_type])
-            # Ensure minimum capacity of 1
-            engine_capacity = max(1, engine_capacity)
-            self.engine_buffers[engine_type] = deque(maxlen=engine_capacity)
+        # Normalize buffer composition to ensure it sums to 1
+        total = sum(self.buffer_composition.values())
+        self.buffer_composition = {
+            k: v/total for k, v in self.buffer_composition.items()
+        }
 
-        # Create mapping from env_id to engine type
-        self.env_to_engine = {}
-        for engine_type, count in self.engine_counts.items():
-            for i in range(count):
-                self.env_to_engine[f"{engine_type}_{i}"] = engine_type
+        print(f"Target buffer composition: {self.buffer_composition}")
 
-        # For tracking sampling distribution and other stats
-        self.sampled_counts: Dict[str, int] = {}
-        self.composition_tolerance = 0.05  # 5% tolerance
+        # Initialize buffers with exact capacities
+        self._init_buffers()
+
+        self.sampled_counts = {}
+        self.composition_tolerance = 0.02  # 2% tolerance
         self.current_episode = 0
         self.position = 0
+        self._total_samples = 0
+        self._last_composition = None
 
-    def push(self,
-             state: np.ndarray,
-             action: Union[int, np.ndarray],
-             reward: float,
-             next_state: np.ndarray,
-             done: bool,
-             env_id: str,
-             current_episode: int) -> None:
-        """Add experience to the buffer."""
+    def _init_buffers(self):
+        print("Starting buffer initialization...")
+        print(f"Engine types: {self.engine_types}")
+        print(f"Buffer composition: {self.buffer_composition}")
+
+        self.engine_buffers = {}
+        remaining_capacity = self.capacity
+
+        # Make sure we have all engine types
+        all_engines = set(self.engine_counts.keys()) | set(
+            self.buffer_composition.keys())
+        self.engine_types = list(all_engines)
+        print(f"Combined engine types: {self.engine_types}")
+
+        for engine_type in list(self.engine_types)[:-1]:
+            print(f"Allocating capacity for {engine_type}")
+            engine_capacity = int(
+                self.capacity * self.buffer_composition[engine_type])
+            engine_capacity = max(1, engine_capacity)
+            self.engine_buffers[engine_type] = deque(maxlen=engine_capacity)
+            remaining_capacity -= engine_capacity
+
+        if self.engine_types:
+            last_engine = self.engine_types[-1]
+            print(f"Allocating remaining capacity for {last_engine}")
+            self.engine_buffers[last_engine] = deque(
+                maxlen=max(1, remaining_capacity))
+
+        print(f"Final engine buffers: {list(self.engine_buffers.keys())}")
+
+    def push(self, state, action, reward, next_state, done, env_id, current_episode):
+        """Add experience with strict composition maintenance"""
         self.current_episode = current_episode
-
-        # Convert inputs to numpy arrays
-        state = np.asarray(state)
-        next_state = np.asarray(next_state)
-        action = np.asarray(action)
-
-        # Extract engine type from env_id
         engine_type = env_id.split('_')[0] if '_' in env_id else 'gym'
 
-        # Ensure engine type exists in buffers
         if engine_type not in self.engine_buffers:
-            self.engine_buffers[engine_type] = deque(
-                maxlen=int(self.capacity * 0.5))
-            self.engine_types.append(engine_type)
-            # Default to equal split
-            self.buffer_composition[engine_type] = 0.5
+            raise ValueError(
+                f"Unknown engine type: {engine_type}. Must be one of {list(self.buffer_composition.keys())}")
 
-        experience = (state, action, reward, next_state,
-                      done, env_id, current_episode)
-
-        # Add to appropriate buffer
         target_buffer = self.engine_buffers[engine_type]
+        experience = (state, action, reward, next_state, done, env_id)
+
+        # Check composition before adding
+        current_comp = self.get_current_composition()
+        target_comp = self.buffer_composition[engine_type]
+
         if len(target_buffer) == target_buffer.maxlen:
-            if self.composition_needs_adjustment(engine_type):
-                if not self.adjust_composition(engine_type):
-                    target_buffer.popleft()
-            else:
-                target_buffer.popleft()
+            # If this engine is already at or above its target composition,
+            # we need to make space by removing from over-represented engines
+            if current_comp.get(engine_type, 0) >= target_comp:
+                self.adjust_composition(engine_type)
+            target_buffer.popleft()
 
         target_buffer.append(experience)
-        self.position = (self.position + 1) % self.capacity
+        self._last_composition = None  # Force composition recalculation
 
     def sample(self, batch_size: int) -> Tuple:
         """Sample a batch of experiences."""
         if batch_size > len(self):
             raise ValueError(
-                f"Requested batch size {batch_size} is larger than buffer size {len(self)}"
-            )
-
-        if self.strategy == 'uniform':
-            return self.uniform_sampling(batch_size)
-        else:  # stratified
-            return self.stratified_sampling(batch_size)
+                f"Requested batch size {batch_size} is larger than buffer size {len(self)}")
+        return self.uniform_sampling(batch_size) if self.strategy == 'uniform' else self.stratified_sampling(batch_size)
 
     def uniform_sampling(self, batch_size: int) -> Tuple:
-        """Perform uniform sampling from the buffer."""
+        """Perform uniform sampling from all experiences."""
         all_experiences = []
         for buffer in self.engine_buffers.values():
             all_experiences.extend(buffer)
@@ -160,57 +164,15 @@ class CompositionReplayBuffer:
         # Fill remaining samples if needed
         remaining = batch_size - len(samples)
         if remaining > 0:
-            available_experiences = []
+            all_experiences = []
             for buffer in self.engine_buffers.values():
-                available_experiences.extend(buffer)
+                all_experiences.extend(buffer)
 
-            # Remove already sampled experiences
-            used_experiences = set(tuple(map(str, exp)) for exp in samples)
-            available_experiences = [
-                exp for exp in available_experiences
-                if tuple(map(str, exp)) not in used_experiences
-            ]
-
-            if available_experiences:
-                remaining_samples = random.sample(
-                    available_experiences,
-                    min(remaining, len(available_experiences))
-                )
-                samples.extend(remaining_samples)
+            if all_experiences:
+                samples.extend(random.sample(all_experiences, remaining))
 
         self._update_sampled_counts(samples)
         return self._prepare_batch(samples)
-
-    def composition_needs_adjustment(self, engine_type: str) -> bool:
-        """Check if adding to this engine would violate composition targets."""
-        if len(self) == 0:
-            return False
-
-        current_comp = self.get_current_composition()
-        target = self.buffer_composition[engine_type]
-        current = current_comp[engine_type]
-        return current > (target + self.composition_tolerance)
-
-    def adjust_composition(self, target_engine: str) -> bool:
-        """Remove experiences from over-represented buffers."""
-        current_comp = self.get_current_composition()
-
-        # Find most over-represented engine
-        over_represented = None
-        max_excess = -float('inf')
-
-        for engine, target in self.buffer_composition.items():
-            if engine == target_engine:
-                continue
-            excess = current_comp.get(engine, 0) - target
-            if excess > max_excess and len(self.engine_buffers[engine]) > 0:
-                max_excess = excess
-                over_represented = engine
-
-        if over_represented and max_excess > self.composition_tolerance:
-            self.engine_buffers[over_represented].popleft()
-            return True
-        return False
 
     def _update_sampled_counts(self, batch: List[Tuple]) -> None:
         """Track sampling distribution."""
@@ -220,24 +182,53 @@ class CompositionReplayBuffer:
                 env_id, 0) + 1
 
     def _prepare_batch(self, batch: List[Tuple]) -> Tuple:
-        """Convert list of experiences to batch of arrays."""
-        states, actions, rewards, next_states, dones, env_ids, episodes = zip(
-            *batch)
-        return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
-                np.array(next_states), np.array(dones, dtype=np.bool_),
-                np.array(env_ids), np.array(episodes))
+        """Convert batch to numpy arrays efficiently."""
+        states, actions, rewards, next_states, dones, env_ids = zip(*batch)
+        return (
+            np.array(states),
+            np.array(actions),
+            np.array(rewards, dtype=np.float32),
+            np.array(next_states),
+            np.array(dones, dtype=np.bool_),
+            np.array(env_ids)
+        )
+
+    def adjust_composition(self, target_engine: str) -> bool:
+        """Strictly enforce composition by removing from over-represented engines"""
+        current_comp = self.get_current_composition()
+
+        # Calculate relative deviation from target for each engine
+        deviations = {
+            engine: (current_comp.get(
+                engine, 0) - self.buffer_composition[engine]) / self.buffer_composition[engine]
+            for engine in self.engine_types
+        }
+
+        # Find most over-represented engine
+        over_represented = max(deviations.items(), key=lambda x: x[1])[0]
+
+        if over_represented != target_engine and len(self.engine_buffers[over_represented]) > 0:
+            # Remove oldest experience from most over-represented engine
+            self.engine_buffers[over_represented].popleft()
+            self._last_composition = None
+            return True
+
+        return False
 
     def get_current_composition(self) -> Dict[str, float]:
-        """Calculate current composition of experiences."""
-        total_experiences = sum(len(buffer)
-                                for buffer in self.engine_buffers.values())
-        if total_experiences == 0:
-            return {engine: 0.0 for engine in self.engine_types}
-
-        return {
-            engine: len(buffer)/total_experiences
-            for engine, buffer in self.engine_buffers.items()
-        }
+        """Calculate current composition with caching"""
+        if self._last_composition is None:
+            total_experiences = sum(len(buffer)
+                                    for buffer in self.engine_buffers.values())
+            if total_experiences == 0:
+                self._last_composition = {
+                    engine: 0.0 for engine in self.engine_types}
+            else:
+                self._last_composition = {
+                    engine: len(buffer)/total_experiences
+                    for engine, buffer in self.engine_buffers.items()
+                }
+        return self._last_composition
 
     def get_env_id_distribution(self) -> Dict[str, int]:
         """Get distribution of experiences across environment IDs."""
@@ -289,7 +280,9 @@ class CompositionReplayBuffer:
             buffer.clear()
         self.sampled_counts.clear()
         self.position = 0
+        self._total_samples = 0
+        self._last_composition = None
 
     def __len__(self) -> int:
-        """Return current size of the buffer."""
+        """Get total number of experiences."""
         return sum(len(buffer) for buffer in self.engine_buffers.values())

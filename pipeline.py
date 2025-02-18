@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from environment import EnvironmentOrchestrator
 from dashboard import Dashboard
+import time
 from replay_buffer import ReplayBuffer  # if needed
 
 
@@ -23,7 +24,6 @@ def convert_env_id(env_id):
 
 
 class TrainingStats:
-    # ... your existing implementation remains unchanged ...
     def __init__(self, engines_dict):
         self.engines = []
         for engine, count in engines_dict.items():
@@ -99,7 +99,6 @@ class TrainingPipeline:
                             break
                         raise
 
-                    # Convert env_ids (e.g. "gym_0") to integer indices
                     env_indices = [convert_env_id(eid) for eid in env_ids]
 
                     for i, env_idx in enumerate(env_indices):

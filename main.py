@@ -30,9 +30,6 @@ if __name__ == "__main__":
 
     replay_buffer_uniform = ReplayBuffer(10000, strategy='uniform')
 
-    composition_buffer = CompositionReplayBuffer(capacity=10000, strategy=sampling_strategies[0], sampling_composition={
-        'gym': 0.3, 'mujoco': 0.7}, buffer_composition={'gym': 0.4, 'mujoco': 0.6})
-
     sac_agent = SACAgent(state_dim, action_dim, replay_buffer,
                          hidden_dim=128, lr=1e-4, alpha=0.2, warmup_steps=10000)
     dqn_agent = DQNAgentDisc(state_dim, action_dim, replay_buffer_uniform,
@@ -41,10 +38,13 @@ if __name__ == "__main__":
 #    pipeline = TrainingPipeline(
  #       env_name, engines, buffer_capacity, batch_size, episodes, steps_per_episode, dqn_agent)
 
-    sac_agent_simpple = DQNAgentDisc(state_dim, action_dim, ReplayBuffer(10000, strategy='uniform'
-                                                                         ), lr=1e-4, gamma=0.99, epsilon_decay=1e-3)
+    composition_buffer = CompositionReplayBuffer(capacity=10000, strategy='stratified', sampling_composition={
+        'gym': 0.3, 'mujoco': 0.7}, buffer_composition={'gym': 0.3, 'mujoco': 0.7})
+
+    sac_agent_simpple = DQNAgentDisc(
+        state_dim, action_dim, composition_buffer, lr=1e-4, gamma=0.99, epsilon_decay=1e-3)
     pipeline_simple = TrainingPipeline(
-        'CartPole-v1', {'gym': 1}, 25000, 256, 1000, 500, dqn_agent)
+        'CartPole-v1', {'gym': 3, 'mujoco': 2}, 25000, 256, 1000, 500, sac_agent_simpple)
     print(state_dim, action_dim)
     pipeline_simple.run()
     pipeline_simple.plot_rewards()
