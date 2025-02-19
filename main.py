@@ -41,10 +41,10 @@ if __name__ == "__main__":
     composition_buffer = CompositionReplayBuffer(capacity=10000, strategy='stratified', sampling_composition={
         'gym': 0.3, 'mujoco': 0.7}, buffer_composition={'gym': 0.3, 'mujoco': 0.7})
 
-    sac_agent_simpple = DQNAgentDisc(
+    dqn_agent_simpple = DQNAgentDisc(
         state_dim, action_dim, composition_buffer, lr=1e-4, gamma=0.99, epsilon_decay=1e-3)
     pipeline_simple = TrainingPipeline(
-        'CartPole-v1', {'gym': 3, 'mujoco': 2}, 25000, 256, 1000, 500, sac_agent_simpple)
+        'CartPole-v1', {'gym': 3, 'mujoco': 2}, 25000, 256, 1000, 500, dqn_agent_simpple)
     print(state_dim, action_dim)
     pipeline_simple.run()
     pipeline_simple.plot_rewards()

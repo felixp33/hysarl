@@ -2,11 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from environment import EnvironmentOrchestrator
 from dashboard import Dashboard
-
-import numpy as np
-import matplotlib.pyplot as plt
-from environment import EnvironmentOrchestrator
-from dashboard import Dashboard
 import time
 from replay_buffer import ReplayBuffer  # if needed
 
@@ -40,6 +35,9 @@ class TrainingStats:
         self.instance_start_times = {i: None for i in range(len(self.engines))}
         self.instance_step_times = {i: [] for i in range(len(self.engines))}
         self.episode_durations = {engine: [] for engine in self.unique_engines}
+
+        # Add step tracking
+        self.episode_steps = {engine: [] for engine in self.unique_engines}
 
     def start_instance_timing(self, instance_idx):
         """Start timing for a specific instance"""
@@ -82,17 +80,27 @@ class TrainingStats:
             type_reward = np.mean([episode_rewards[i] for i in indices])
             self.type_rewards[engine_type].append(type_reward)
 
+    def update_steps(self, env_steps):
+        """Update steps for each engine type"""
+        # Store raw steps per engine type without averaging
+        for engine_type in self.unique_engines:
+            indices = self.engine_indices[engine_type]
+            # We want to store actual steps, not mean
+            # or use any other logic that makes sense
+            type_steps = max([env_steps[i] for i in indices])
+            self.episode_steps[engine_type].append(type_steps)
+
     def get_stats(self):
         return {
             'instance': self.instance_rewards,
             'type': self.type_rewards,
-            'episode_durations': self.episode_durations
+            'episode_durations': self.episode_durations,
+            'episode_steps': self.episode_steps
         }
 
 
 class TrainingPipeline:
     def __init__(self, env_name, engines_dict, buffer_capacity, batch_size, episodes, steps_per_episode, agent):
-        # Existing initialization code remains the same
         self.env_name = env_name
         self.engines_dict = engines_dict
         self.total_envs = sum(engines_dict.values())
@@ -181,6 +189,9 @@ class TrainingPipeline:
                 # Compute average episode durations for each engine type
                 self.stats.compute_episode_durations()
 
+                # Update steps for each engine type
+                self.stats.update_steps(env_steps)
+
                 mean_reward = np.mean(episode_rewards)
                 self.rewards_history.append(mean_reward)
                 self.stats.update_rewards(episode_rewards)
@@ -195,12 +206,15 @@ class TrainingPipeline:
 
                 if episode % 10 == 0:
                     print(f"Episode {episode + 1}/{self.episodes}")
-                    for engine_type, rewards in self.stats.get_stats()['type'].items():
-                        print(f"{engine_type} Mean Reward: {rewards[-1]:.3f}")
+                    stats_data = self.stats.get_stats()
+                    for engine_type, rewards in stats_data['type'].items():
+                        steps = stats_data['episode_steps'][engine_type]
                         avg_duration = np.mean(
                             self.stats.episode_durations[engine_type][-10:])
-                        print(f"{engine_type} Avg Duration: {avg_duration:.3f}s")
-                    print(f"Steps: {env_steps}")
+                        print(f"{engine_type}:")
+                        print(f"  Mean Reward: {rewards[-1]:.3f}")
+                        print(f"  Mean Steps: {steps[-1]:.1f}")
+                        print(f"  Avg Duration: {avg_duration:.3f}s")
 
         except Exception as e:
             print(f"Error during training: {e}")

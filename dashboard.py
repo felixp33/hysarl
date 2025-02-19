@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 class Dashboard:
     def __init__(self, num_envs, params):
-        self.fig, self.axes = plt.subplots(2, 3, figsize=(18, 10))
+        self.fig, self.axes = plt.subplots(2, 4, figsize=(18, 10))
         plt.ion()
 
         self.param_text = self.format_params_multicolumn(params, num_columns=3)
@@ -33,6 +33,9 @@ class Dashboard:
         self.episodes = []
         self.short_window = 10
         self.long_window = 100
+        self.episode_steps_history = {engine: []
+                                      for engine in self.engines_dict.keys()}
+        self.type_rewards = {engine: [] for engine in self.engines_dict.keys()}
 
     def plot_rewards(self, rewards_history):
         ax = self.axes[0, 0]
@@ -56,12 +59,12 @@ class Dashboard:
                     color='red', linewidth=2)
         ax.set_xlabel('Episode')
         ax.set_ylabel('Reward')
-        ax.set_title('Training Progress')
+        ax.set_title('Weighted Average Reward')
         ax.legend()
         ax.grid(True)
 
     def plot_sampling_composition(self):
-        ax = self.axes[0, 1]
+        ax = self.axes[1, 3]
         ax.cla()
 
         if any(self.samples_history.values()):
@@ -96,7 +99,7 @@ class Dashboard:
         ax.set_ylim([0, 100])
 
     def plot_average_sample_age(self):
-        ax = self.axes[0, 2]
+        ax = self.axes[1, 2]
         ax.cla()
 
         for engine_type, ages in self.sample_ages_history.items():
@@ -107,8 +110,8 @@ class Dashboard:
                         linewidth=2)
 
         ax.set_xlabel('Episode')
-        ax.set_ylabel('Average Sample Age (episodes)')
-        ax.set_title('Average Sample Age by Engine Type')
+        ax.set_ylabel('Average Experience Age (episodes)')
+        ax.set_title('Average Experience Age by Engine Type')
         ax.legend()
         ax.grid(True)
 
@@ -116,13 +119,20 @@ class Dashboard:
         """
         Plots the moving average (10 episodes) of time taken per episode for each engine type.
         """
-        ax = self.axes[1, 0]
+        ax = self.axes[0, 3]
         ax.cla()
 
         window_size = 10  # Moving average window
 
+        # Get a color iterator from matplotlib's default color cycle
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        color_idx = 0
+
         for engine_type, times in self.episode_times_history.items():
             if times:
+                current_color = colors[color_idx %
+                                       len(colors)]  # Cycle through colors
+
                 # Calculate moving average if we have enough data
                 if len(times) >= window_size:
                     moving_avg = self.calculate_moving_average(
@@ -130,19 +140,21 @@ class Dashboard:
                     ma_episodes = np.arange(window_size - 1, len(times))
                     current_avg = moving_avg[-1] if len(moving_avg) > 0 else 0
 
-                    # Plot both raw data and moving average
+                    # Plot both raw data and moving average with the same color
                     ax.plot(self.episodes, times, alpha=0.3,
-                            label=f'{engine_type} (raw)', linewidth=1)
+                            label=f'{engine_type} (raw)', linewidth=1,
+                            color=current_color)
                     ax.plot(ma_episodes, moving_avg,
                             label=f'{engine_type} ({current_avg:.2f}s avg)',
-                            linewidth=2)
+                            linewidth=2, color=current_color)
                 else:
                     # If we don't have enough data for moving average, just plot raw data
                     current_time = times[-1] if times else 0
                     ax.plot(self.episodes, times,
                             label=f'{engine_type} ({current_time:.2f}s)',
-                            linewidth=2)
+                            linewidth=2, color=current_color)
 
+                color_idx += 1
         ax.set_xlabel('Episode')
         ax.set_ylabel('Time (seconds)')
         ax.set_title(
@@ -151,7 +163,7 @@ class Dashboard:
         ax.grid(True)
 
     def plot_buffer_composition(self):
-        ax = self.axes[1, 1]
+        ax = self.axes[1, 0]
         ax.cla()
         ax2 = ax.twinx()
 
@@ -193,7 +205,7 @@ class Dashboard:
         ax2.set_ylim([0, 100])
 
     def plot_buffer_instance_distribution(self):
-        ax = self.axes[1, 2]
+        ax = self.axes[1, 1]
         ax.cla()
         for env_id, composition in self.buffer_composition_history.items():
             if composition:
@@ -209,6 +221,8 @@ class Dashboard:
     def update(self, rewards_history, replay_buffer, episode, episode_dones, stats):
         # Get replay buffer statistics
         buffer_stats = replay_buffer.get_statistics()
+
+        self.type_rewards = stats.get_stats()['type']
 
         # Update buffer fullness
         self.buffer_fullness_history.append(buffer_stats['fullness'] * 100)
@@ -243,6 +257,10 @@ class Dashboard:
             for engine_type, age in buffer_stats['sample_ages'].items():
                 self.sample_ages_history[engine_type].append(age)
 
+        if hasattr(stats, 'episode_steps'):
+            for engine_type, steps in stats.episode_steps.items():
+                if steps:
+                    self.episode_steps_history[engine_type].append(steps[-1])
         self.episodes.append(episode)
 
         # Update all plots
@@ -252,6 +270,8 @@ class Dashboard:
         self.plot_episode_times()
         self.plot_buffer_composition()
         self.plot_buffer_instance_distribution()
+        self.plot_episode_steps()
+        self.plot_rewards_by_engine()
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.pause(0.01)
@@ -276,3 +296,85 @@ class Dashboard:
     def close(self):
         plt.ioff()
         plt.show()
+
+    def plot_episode_steps(self):
+        """
+        Plots the steps taken per episode for each engine type, with individual points and
+        a 10-episode moving average.
+        """
+        ax = self.axes[0, 2]  # Using the last unused subplot
+        ax.cla()
+
+        window_size = 10  # Moving average window
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        color_idx = 0
+
+        for engine_type, steps in self.episode_steps_history.items():
+            if steps:
+                current_color = colors[color_idx % len(colors)]
+
+                if len(steps) >= window_size:
+                    moving_avg = self.calculate_moving_average(
+                        steps, window_size)
+                    ma_episodes = np.arange(window_size - 1, len(steps))
+                    current_avg = moving_avg[-1] if len(moving_avg) > 0 else 0
+
+                    # Plot individual steps as scatter points
+                    ax.scatter(self.episodes, steps, alpha=0.3,
+                               label=f'{engine_type} (steps)', color=current_color, s=20)
+                    # Plot moving average as solid line
+                    ax.plot(ma_episodes, moving_avg,
+                            label=f'{engine_type} ({current_avg:.0f} avg)',
+                            linewidth=2, color=current_color)
+                else:
+                    current_steps = steps[-1] if steps else 0
+                    ax.scatter(self.episodes, steps,
+                               label=f'{engine_type} ({current_steps:.0f})',
+                               color=current_color, s=20)
+
+                color_idx += 1
+
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Steps')
+        ax.set_title(
+            f'Steps per Episode ({window_size}-Episode Moving Average)')
+        ax.legend()
+        ax.grid(True)
+
+    def plot_rewards_by_engine(self):
+        """
+        Plots the rewards grouped by engine type, showing raw data as dots and moving averages as lines.
+        """
+        ax = self.axes[0, 1]  # Using the remaining subplot in the top row
+        ax.cla()
+
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        color_idx = 0
+
+        for engine_type, rewards in self.type_rewards.items():
+            if rewards:
+                current_color = colors[color_idx % len(colors)]
+
+                # Plot raw rewards as scatter points with low alpha
+                ax.scatter(self.episodes, rewards, alpha=0.3,
+                           # s=20 sets the dot size
+                           label=f'{engine_type} (raw)', s=20,
+                           color=current_color)
+
+                # Calculate and plot moving averages if enough data
+                if len(rewards) >= self.short_window:
+                    short_ma = self.calculate_moving_average(
+                        rewards, self.short_window)
+                    short_ma_episodes = np.arange(
+                        self.short_window - 1, len(rewards))
+                    ax.plot(short_ma_episodes, short_ma,
+                            label=f'{engine_type} ({self.short_window}-ep avg)',
+                            color=current_color, linewidth=2)
+
+                color_idx += 1
+
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Reward')
+        ax.set_title('Average Reward by Engine Type')
+        ax.legend()
+        ax.grid(True)
