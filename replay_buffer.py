@@ -9,9 +9,9 @@ class ReplayBuffer:
                  buffer_composition: Optional[Dict[str, float]] = None,
                  ):
 
-        if strategy not in ['uniform', 'stratified', 'stratified_shift']:
+        if strategy not in ['uniform', 'stratified']:
             raise ValueError(
-                "Strategy must be in ['uniform', 'stratified', 'stratified_shift']")
+                "Strategy must be in ['uniform', 'stratified']")
 
         if strategy == 'stratified' and sampling_composition is None:
             raise ValueError(
@@ -45,7 +45,6 @@ class ReplayBuffer:
         action = np.asarray(action)
 
         experience = (state, action, reward, next_state, done, env_id)
-        print(experience)
 
         if len(self.buffer) < self.capacity:
             self.buffer.append(experience)

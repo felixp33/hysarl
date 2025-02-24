@@ -88,6 +88,7 @@ class TrainingStats:
             # We want to store actual steps, not mean
             # or use any other logic that makes sense
             type_steps = max([env_steps[i] for i in indices])
+            print(f"Type steps for {engine_type}: {type_steps}")
             self.episode_steps[engine_type].append(type_steps)
 
     def get_stats(self):
@@ -160,8 +161,10 @@ class TrainingPipeline:
                         if active_envs[env_idx] and env_steps[env_idx] < self.steps_per_episode:
                             self.stats.end_instance_timing(env_idx)
 
+                    # First, collect experiences for active environments
                     for i, env_idx in enumerate(env_indices):
                         if active_envs[env_idx] and env_steps[env_idx] < self.steps_per_episode:
+                            # Store the transition in replay buffer
                             self.agent.replay_buffer.push(
                                 states[env_idx],
                                 actions[env_idx],
@@ -173,11 +176,25 @@ class TrainingPipeline:
                             )
                             episode_rewards[env_idx] += rewards[i]
                             env_steps[env_idx] += 1
+
+                            # If done, mark environment as inactive but DON'T reset yet
                             if dones[i]:
                                 episode_dones[env_idx] = True
                                 active_envs[env_idx] = False
-                                temp_states = self.envs.reset()
-                                states[env_idx] = temp_states[env_idx]
+
+                    # After processing all experiences, then handle resets
+                    # This keeps a clean separation between experience collection and environment management
+                    reset_indices = [i for i, active in enumerate(
+                        active_envs) if not active]
+                    if reset_indices:
+                        # Only reset environments that need resetting
+                        reset_states = self.envs.reset_specific(reset_indices)
+
+                        # Update states for reset environments
+                        for idx, state in zip(reset_indices, reset_states):
+                            states[idx] = state
+                            # Reactivate the environment
+                            active_envs[idx] = True
 
                     for i, next_state in zip(env_indices, next_states):
                         if active_envs[i] and env_steps[i] < self.steps_per_episode:

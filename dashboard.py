@@ -130,8 +130,7 @@ class Dashboard:
 
         for engine_type, times in self.episode_times_history.items():
             if times:
-                current_color = colors[color_idx %
-                                       len(colors)]  # Cycle through colors
+                current_color = colors[color_idx % len(colors)]
 
                 # Calculate moving average if we have enough data
                 if len(times) >= window_size:
@@ -140,21 +139,24 @@ class Dashboard:
                     ma_episodes = np.arange(window_size - 1, len(times))
                     current_avg = moving_avg[-1] if len(moving_avg) > 0 else 0
 
-                    # Plot both raw data and moving average with the same color
-                    ax.plot(self.episodes, times, alpha=0.3,
-                            label=f'{engine_type} (raw)', linewidth=1,
-                            color=current_color)
+                    # Plot raw data as scatter points
+                    ax.scatter(self.episodes, times, alpha=0.3,
+                               label=f'{engine_type} (raw)',
+                               color=current_color, s=20)
+
+                    # Plot moving average as solid line
                     ax.plot(ma_episodes, moving_avg,
                             label=f'{engine_type} ({current_avg:.2f}s avg)',
                             linewidth=2, color=current_color)
                 else:
                     # If we don't have enough data for moving average, just plot raw data
                     current_time = times[-1] if times else 0
-                    ax.plot(self.episodes, times,
-                            label=f'{engine_type} ({current_time:.2f}s)',
-                            linewidth=2, color=current_color)
+                    ax.scatter(self.episodes, times,
+                               label=f'{engine_type} ({current_time:.2f}s)',
+                               color=current_color, s=20)
 
                 color_idx += 1
+
         ax.set_xlabel('Episode')
         ax.set_ylabel('Time (seconds)')
         ax.set_title(

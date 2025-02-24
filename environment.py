@@ -1,30 +1,70 @@
 import gymnasium as gym
 from multiprocessing import Process, Pipe
+import numpy as np
 
 # Environment specifications
 env_specs = {
-    'CartPole-v1': {
+    'CartPole': {
         'state_dim': 4,
         'action_dim': 2,
         'engines': {
-            'gym': 'CartPole-v1',
-            'mujoco': 'CartPole-v1',
-            'pybullet': 'CartPole-v1'
+            'gym': 'CartPole-v1'
         }
     },
-    'Pendulum-v1': {
+    'Pendulum': {
         'state_dim': 3,
         'action_dim': 1,
         'engines': {
-            'gym': 'Pendulum-v1',
-            'mujoco': 'InvertedPendulum-v5',
-            'pybullet': 'InvertedPendulum-v5'
+            'gym': 'Pendulum-v1'
         }
     },
-    'MountainCarContinuous-v0': {
-        'state_dim': 2,
+    'HalfCheetah': {
+        'state_dim': 17,
+        'action_dim': 6,
+        'engines': {
+            'mujoco': 'HalfCheetah-v5',
+            'pybullet': 'HalfCheetah-v5'
+        }
+    },
+    'Hopper': {
+        'state_dim': 11,
+        'action_dim': 3,
+        'engines': {
+            'mujoco': 'Hopper-v4',
+            'pybullet': 'HopperBulletEnv-v0'
+        }
+    },
+    'Walker2D': {
+        'state_dim': 17,
+        'action_dim': 6,
+        'engines': {
+            'mujoco': 'Walker2d-v4',
+            'pybullet': 'Walker2DBulletEnv-v0'
+        }
+    },
+    'Ant': {
+        'state_dim': 27,
+        'action_dim': 8,
+        'engines': {
+            'mujoco': 'Ant-v4',
+            'pybullet': 'AntBulletEnv-v0'
+        }
+    },
+    'InvertedPendulum': {
+        'state_dim': 4,
         'action_dim': 1,
-        'engines': {'gym': 'MountainCarContinuous-v0'}
+        'engines': {
+            'mujoco': 'InvertedPendulum-v4',
+            'pybullet': 'InvertedPendulumBulletEnv-v0'
+        }
+    },
+    'Humanoid': {
+        'state_dim': 292,  # Large state space
+        'action_dim': 17,
+        'engines': {
+            'mujoco': 'Humanoid-v4',
+            'pybullet': 'HumanoidBulletEnv-v0'
+        }
     }
 }
 
@@ -44,14 +84,12 @@ class EnvironmentWorker(Process):
 
             while True:
                 cmd, data = self.conn.recv()
-              #  print(f"Worker {self.env_id} received {cmd} with data {data}")
+                # print(f"Worker {self.env_id} received {cmd} with data {data}")
 
                 if cmd == 'step':
                     next_state, reward, terminated, truncated, _ = env.step(
                         data)
                     done = terminated or truncated
-                    if done:
-                        next_state, _ = env.reset()
                     # Format the identifier as "engine_envid", e.g. "gym_0"
                     env_identifier = f"{self.engine}_{self.env_id}"
                     self.conn.send((next_state, reward, done, env_identifier))
@@ -119,6 +157,38 @@ class EnvironmentOrchestrator:
             return states
         except Exception as e:
             print(f"Error in environment reset: {e}")
+            self.close()
+            raise
+
+    def reset_specific(self, indices):
+        """
+        Reset only the environments at the specified indices.
+
+        Args:
+            indices: List of environment indices to reset
+
+        Returns:
+            List of reset states for the specified environments
+        """
+        try:
+            reset_states = []
+            for idx in indices:
+                if idx < len(self.conns):
+                    conn = self.conns[idx]
+                    conn.send(('reset', None))
+                    if not conn.poll(timeout=1.0):
+                        print(f"Timeout waiting for worker {idx} to reset")
+                        # Return the last known state or zeros if we time out
+                        reset_states.append(
+                            np.zeros(env_specs[self.env_name]['state_dim']))
+                        continue
+                    state = conn.recv()
+                    reset_states.append(state)
+                    self.active_envs[idx] = True
+
+            return reset_states
+        except Exception as e:
+            print(f"Error in environment reset_specific: {e}")
             self.close()
             raise
 
