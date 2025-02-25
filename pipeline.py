@@ -88,7 +88,6 @@ class TrainingStats:
             # We want to store actual steps, not mean
             # or use any other logic that makes sense
             type_steps = max([env_steps[i] for i in indices])
-            print(f"Type steps for {engine_type}: {type_steps}")
             self.episode_steps[engine_type].append(type_steps)
 
     def get_stats(self):
@@ -174,6 +173,7 @@ class TrainingPipeline:
                                 env_ids[i],
                                 episode
                             )
+                            self.agent.total_steps += 1
                             episode_rewards[env_idx] += rewards[i]
                             env_steps[env_idx] += 1
 

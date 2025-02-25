@@ -9,11 +9,11 @@ if __name__ == "__main__":
     env_name = 'HalfCheetah'
 
     # Use one instance of each engine
-    engines = {'mujoco': 2, 'pybullet': 4}
+    engines = {'mujoco': 1, 'pybullet': 1}
 
     # Training parameters
     buffer_capacity = 1000000  # 1M capacity
-    batch_size = 256
+    batch_size = 512
     episodes = 500
     steps_per_episode = 1000
 
@@ -26,8 +26,9 @@ if __name__ == "__main__":
 
     # Define target compositions for buffer and sampling
     # Equal balance between engines (adjust as needed)
-    buffer_composition = {'mujoco': 0.7, 'pybullet': 0.3}
-    sampling_composition = {'mujoco': 0.7, 'pybullet': 0.3}
+    # {'mujoco': 1, 'pybullet': 0}
+    buffer_composition = {'mujoco': 1.0, 'pybullet': 0.5}
+    sampling_composition = {'mujoco': 1.0, 'pybullet': 0.5}
 
     # Initialize the composition-controlled replay buffer
     composition_buffer = CompositionReplayBuffer(
@@ -46,8 +47,8 @@ if __name__ == "__main__":
         hidden_dim=256,      # Larger network for complex control
         lr=3e-4,             # Standard learning rate for SAC
         gamma=0.99,          # Standard discount factor
-        tau=0.005,           # Soft target update rate
-        alpha=0.2,           # Initial temperature parameter
+        tau=0.01,           # Soft target update rate
+        alpha=0.3,           # Initial temperature parameter
         target_entropy=-action_dim,  # Heuristic for continuous control
         grad_clip=1.0,       # Prevent exploding gradients
         warmup_steps=10000   # Exploration phase

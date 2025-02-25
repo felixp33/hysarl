@@ -15,7 +15,7 @@ def initialize_weights(module, gain=1):
 
 
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim=256, log_std_min=-20, log_std_max=2):
+    def __init__(self, state_dim, action_dim, hidden_dim=256, log_std_min=-5, log_std_max=2):
         super().__init__()
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
@@ -129,7 +129,9 @@ class SACAgent:
 
         # Automatic entropy tuning
         self.target_entropy = -action_dim if target_entropy is None else target_entropy
-        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
+        self.log_alpha = torch.tensor(
+            [np.log(0.5)], requires_grad=True, device=self.device)
+
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=lr)
 
         # Initialize trackers for monitoring
@@ -140,47 +142,45 @@ class SACAgent:
         self.entropy_history = []
 
     def select_action(self, state, evaluate=False):
-        """Select action with warm-up exploration"""
+        """Select action with warm-up exploration and proper noise handling."""
         with torch.no_grad():
             state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
 
             if evaluate:
-                # During evaluation, use mean action without exploration
+                # Use deterministic action (mean) for evaluation
                 mean, _ = self.actor(state)
                 action = torch.tanh(mean)
             else:
-                # During training
                 if self.total_steps < self.warmup_steps:
-                    # Pure Gaussian exploration during warm-up
-                    action = torch.normal(
-                        mean=torch.zeros_like(
-                            state[:, :self.actor.action_dim]),
-                        std=self.initial_noise_scale
+                    # Warmup phase: Sample purely random actions within [-1,1]
+                    action = torch.tanh(
+                        torch.normal(
+                            mean=torch.zeros_like(
+                                state[:, :self.actor.action_dim]),
+                            std=self.initial_noise_scale
+                        )
                     )
                 else:
-                    # Regular SAC sampling with noise decay
-                    action, _ = self.actor.sample(state)
+                    # Regular SAC sampling
+                    # Actor outputs tanh-squashed action
+                    raw_action, _ = self.actor.sample(state)
 
-                    # Add decaying exploration noise
-                    noise_scale = max(0.0,
-                                      self.initial_noise_scale *
-                                      (1.0 - self.total_steps /
-                                       (2 * self.warmup_steps))
-                                      )
+                    # Apply noise BEFORE tanh (to avoid going out of bounds)
+                    noise_scale = max(0.0, self.initial_noise_scale *
+                                      (1.0 - self.total_steps / (2 * self.warmup_steps)))
                     if noise_scale > 0:
                         noise = torch.normal(
-                            mean=0.0,
-                            std=noise_scale,
-                            size=action.shape,
-                            device=self.device
-                        )
-                        action += noise
+                            mean=0.0, std=noise_scale, size=raw_action.shape, device=self.device)
+                        raw_action += noise
 
-            # Ensure actions stay within bounds
-            action = torch.clamp(action, -1.0, 1.0)
+                    # Apply tanh again for final squashing
+                    action = torch.tanh(raw_action)
+
             return action.cpu().numpy()[0]
 
     def train(self, batch_size):
+        """Performs a single training step of the SAC algorithm."""
+
         if len(self.replay_buffer) < batch_size:
             return
 
@@ -199,27 +199,44 @@ class SACAgent:
         # Sample from replay buffer
         states, actions, rewards, next_states, dones, _ = self.replay_buffer.sample(
             batch_size)
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.FloatTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).unsqueeze(1).to(self.device)
 
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
+        # ✅ Fix float64-to-float32 conversion
+        states = torch.tensor(states, dtype=torch.float32, device=self.device)
+        actions = torch.tensor(
+            actions, dtype=torch.float32, device=self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32,
+                               device=self.device).view(-1, 1)
+        next_states = torch.tensor(
+            next_states, dtype=torch.float32, device=self.device)
+        dones = torch.tensor(dones, dtype=torch.float32,
+                             device=self.device).view(-1, 1)
 
         # Update critics
         with torch.no_grad():
             next_actions, next_log_probs = self.actor.sample(next_states)
             q1_next = self.critic1_target(next_states, next_actions)
             q2_next = self.critic2_target(next_states, next_actions)
-            q_next = torch.min(q1_next, q2_next)
-            # Clamp rewards for stability
-            rewards_clamped = torch.clamp(rewards, -100, 100)
-            target_q = rewards_clamped + \
-                (1 - dones) * self.gamma * (q_next - self.alpha * next_log_probs)
 
-        # Critic loss with Huber loss for stability
+            # ✅ Ensure correct shapes by taking `min()` without extra dimensions
+            q_next = torch.min(q1_next, q2_next).view(-1, 1)
+
+            # ✅ Clamp rewards and fix shape mismatch
+            rewards_clamped = torch.clamp(rewards, -100, 100).view(-1, 1)
+            target_q = rewards_clamped + \
+                (1 - dones) * self.gamma * (q_next -
+                                            self.alpha * next_log_probs.view(-1, 1))
+
+        # ✅ Ensure `target_q` has correct shape `[batch_size, 1]`
+        target_q = target_q.view(batch_size, 1).to(torch.float32)
+
+        # Compute critic losses
         current_q1 = self.critic1(states, actions)
         current_q2 = self.critic2(states, actions)
+
+        # ✅ Fix shape mismatch for critic loss
+        assert current_q1.shape == target_q.shape, f"Shape mismatch: {current_q1.shape} vs {target_q.shape}"
+        assert current_q2.shape == target_q.shape, f"Shape mismatch: {current_q2.shape} vs {target_q.shape}"
+
         critic1_loss = F.huber_loss(current_q1, target_q)
         critic2_loss = F.huber_loss(current_q2, target_q)
 
@@ -241,6 +258,7 @@ class SACAgent:
         q1 = self.critic1(states, new_actions)
         q2 = self.critic2(states, new_actions)
         q = torch.min(q1, q2)
+
         actor_loss = (self.alpha * log_probs - q).mean()
 
         # Update actor with gradient clipping
@@ -249,18 +267,21 @@ class SACAgent:
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.grad_clip)
         self.actor_optimizer.step()
 
-        # Temperature update
+        # Temperature (Alpha) update
         alpha_loss = -(self.log_alpha * (log_probs +
                        self.target_entropy).detach()).mean()
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.alpha_optimizer.step()
 
-        # Update target networks with error checking
+        # ✅ Ensure total_steps increments correctly
+        self.total_steps += 1
+
+        # Update target networks
         self.safe_update_target(self.critic1_target, self.critic1)
         self.safe_update_target(self.critic2_target, self.critic2)
 
-        # Store metrics
+        # Store training metrics
         self.critic_loss_history.append(
             (critic1_loss.item() + critic2_loss.item()) / 2)
         self.actor_loss_history.append(actor_loss.item())
@@ -278,12 +299,6 @@ class SACAgent:
                     )
         except Exception as e:
             print(f"Error in target network update: {e}")
-
-    def store_experience(self, state, action, reward, next_state, done, env_id):
-        """Store experience and update step counter"""
-        self.replay_buffer.push(state, action, reward,
-                                next_state, done, env_id)
-        self.total_steps += 1
 
     def get_diagnostics(self):
         """Return training diagnostics"""

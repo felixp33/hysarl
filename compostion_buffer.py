@@ -108,8 +108,18 @@ class CompositionReplayBuffer:
                 f"Unknown engine type: {engine_type}. Must be one of {list(self.buffer_composition.keys())}")
 
         target_buffer = self.engine_buffers[engine_type]
-        experience = (state, action, reward, next_state,
-                      done, env_id, current_episode)
+
+        # ✅ Ensure correct data types
+        experience = (
+            np.array(state, dtype=np.float32),  # ✅ Convert state to float32
+            np.array(action, dtype=np.float32),  # ✅ Convert action to float32
+            np.float32(reward),  # ✅ Convert reward to float32
+            # ✅ Convert next_state to float32
+            np.array(next_state, dtype=np.float32),
+            np.float32(done),  # ✅ Convert done flag to float32
+            env_id,
+            current_episode
+        )
 
         # Check composition before adding
         current_comp = self.get_current_composition()
@@ -143,33 +153,30 @@ class CompositionReplayBuffer:
         return self._prepare_batch(batch)
 
     def stratified_sampling(self, batch_size: int) -> Tuple:
-        """Sample according to specified composition."""
         samples = []
+        total_sampled = 0
 
-        # Sample from each group according to the desired composition
+        # Initial samples based on proportions
+        samples_per_engine = {}
         for engine_type, proportion in self.sampling_composition.items():
-            if engine_type not in self.engine_buffers:
-                continue
-
-            buffer = self.engine_buffers[engine_type]
             n_samples = int(proportion * batch_size)
+            buffer = self.engine_buffers[engine_type]
+            actual_samples = min(n_samples, len(buffer))
+            samples.extend(random.sample(list(buffer), actual_samples))
 
-            if n_samples > 0 and len(buffer) > 0:
-                engine_samples = random.sample(
-                    list(buffer),
-                    min(n_samples, len(buffer))
-                )
-                samples.extend(engine_samples)
+        # Fix: Correct oversampling issue
+        if len(samples) > batch_size:
+            samples = random.sample(samples, batch_size)
 
-        # Fill remaining samples if needed
         remaining = batch_size - len(samples)
         if remaining > 0:
+            # Sample remaining experiences uniformly from all engines
             all_experiences = []
             for buffer in self.engine_buffers.values():
                 all_experiences.extend(buffer)
 
-            if all_experiences:
-                samples.extend(random.sample(all_experiences, remaining))
+            additional_samples = random.sample(all_experiences, remaining)
+            samples.extend(additional_samples)
 
         self._update_sampled_counts(samples)
         return self._prepare_batch(samples)
@@ -182,18 +189,19 @@ class CompositionReplayBuffer:
                 env_id, 0) + 1
 
     def _prepare_batch(self, batch: List[Tuple]) -> Tuple:
-        """Convert batch to numpy arrays efficiently."""
-        # Unpack only the first 6 elements, ignoring the episode number
+        """Convert batch to numpy arrays efficiently with correct data types"""
         states, actions, rewards, next_states, dones, env_ids = zip(
             *[(exp[0], exp[1], exp[2], exp[3], exp[4], exp[5]) for exp in batch])
 
         return (
-            np.array(states),
-            np.array(actions),
-            np.array(rewards, dtype=np.float32),
-            np.array(next_states),
-            np.array(dones, dtype=np.bool_),
-            np.array(env_ids)
+            np.array(states, dtype=np.float32),  # ✅ Ensure float32
+            np.array(actions, dtype=np.float32),  # ✅ Ensure float32
+            # ✅ Ensure float32
+            np.array(rewards, dtype=np.float32).reshape(-1, 1),
+            np.array(next_states, dtype=np.float32),  # ✅ Ensure float32
+            # ✅ Convert bool to float32
+            np.array(dones, dtype=np.float32).reshape(-1, 1),
+            np.array(env_ids)  # Keep as-is (likely string)
         )
 
     def adjust_composition(self, target_engine: str) -> bool:
