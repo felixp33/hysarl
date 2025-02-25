@@ -23,7 +23,7 @@ env_specs = {
         'action_dim': 6,
         'engines': {
             'mujoco': 'HalfCheetah-v5',
-            'pybullet': 'HalfCheetah-v5'
+            'brax': 'halfcheetah'
         }
     },
     'Hopper': {
