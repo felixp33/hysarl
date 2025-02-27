@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from environment import EnvironmentOrchestrator
+from debug_environment_parllel import EnvironmentOrchestrator
 from dashboard import Dashboard
 import time
 from replay_buffer import ReplayBuffer  # if needed
@@ -127,9 +127,20 @@ class TrainingPipeline:
 
     def run(self):
         try:
+            print("Entering TrainingPipeline.run() method")
             print("Number of environments:", self.total_envs)
+
+            print("Checking agent:", self.agent)
+            print("Checking replay buffer:", self.agent.replay_buffer)
+
+            print("Attempting to reset environments")
+            states = self.envs.reset()
+            print("Successfully reset environments")
+
             plt.ion()
+
             for episode in range(self.episodes):
+                print(f"Starting episode {episode + 1}/{self.episodes}")
                 states = self.envs.reset()
                 episode_rewards = [0 for _ in range(self.total_envs)]
                 episode_dones = {i: False for i in range(self.total_envs)}
@@ -183,7 +194,6 @@ class TrainingPipeline:
                                 active_envs[env_idx] = False
 
                     # After processing all experiences, then handle resets
-                    # This keeps a clean separation between experience collection and environment management
                     reset_indices = [i for i, active in enumerate(
                         active_envs) if not active]
                     if reset_indices:
@@ -213,6 +223,7 @@ class TrainingPipeline:
                 self.rewards_history.append(mean_reward)
                 self.stats.update_rewards(episode_rewards)
 
+                # Update dashboard
                 self.dashboard.update(
                     self.rewards_history,
                     self.agent.replay_buffer,

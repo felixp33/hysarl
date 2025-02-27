@@ -297,7 +297,7 @@ class Dashboard:
 
     def close(self):
         plt.ioff()
-        plt.show()
+        plt.show(block=True)
 
     def plot_episode_steps(self):
         """
