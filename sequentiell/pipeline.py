@@ -147,6 +147,13 @@ class TrainingPipeline:
                     print(
                         f"  {engine_type}: Reward = {reward:.2f}, Steps = {steps}")
 
+                    # Train the agent multiple times after each environment episode
+                    train_iterations = steps // 10  # Adjust this multiplier as needed
+                    print(f"  Training iterations: {train_iterations}")
+                    for _ in range(train_iterations):
+                        if len(self.agent.replay_buffer) >= self.batch_size:
+                            self.agent.train(self.batch_size)
+
                 # Calculate average reward across all engines (weighted by count)
                 total_weighted_reward = 0
                 total_weight = 0

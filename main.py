@@ -14,12 +14,12 @@ register_brax_envs()
 
 if __name__ == "__main__":
     # Environment setup for HalfCheetah with MuJoCo and Brax
-    env_name = 'HalfCheetah'
+    env_name = 'Reacher'
     # Use one instance of each engine
     engines = {'mujoco': 1, 'brax': 1}
 
     # Training parameters
-    buffer_capacity = 1000000  # 1M capacity
+    buffer_capacity = 100000  # 1M capacity
     batch_size = 512
     episodes = 500
     steps_per_episode = 1000
@@ -32,8 +32,8 @@ if __name__ == "__main__":
 
     # Define target compositions for buffer and sampling
     # Equal balance between engines (adjust as needed)
-    buffer_composition = {'mujoco': 0.5, 'brax': 0.5}
-    sampling_composition = {'mujoco': 0.5, 'brax': 0.5}
+    buffer_composition = {'mujoco': 0.8, 'brax':  0.2}
+    sampling_composition = {'mujoco': 0.8, 'brax': 0.2}
 
     # Initialize the composition-controlled replay buffer
     composition_buffer = CompositionReplayBuffer(
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         state_dim=state_dim,
         action_dim=action_dim,
         replay_buffer=composition_buffer,
-        hidden_dim=256,      # Larger network for complex control
+        hidden_dim=512,      # Larger network for complex control
         lr=3e-4,             # Standard learning rate for SAC
         gamma=0.99,          # Standard discount factor
         tau=0.01,            # Soft target update rate

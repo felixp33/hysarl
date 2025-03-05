@@ -12,18 +12,13 @@ class Dashboard:
 
         self.engines_dict = params['Engines']
 
-        self.env_keys = []
-        global_index = 0
-        for engine, count in self.engines_dict.items():
-            for _ in range(count):
-                self.env_keys.append(f"{engine}_{global_index}")
-                global_index += 1
+        # Simplified tracking for sequential training
+        self.samples_history = {engine: []
+                                for engine in self.engines_dict.keys()}
+        self.buffer_composition_history = {engine: []
+                                           for engine in self.engines_dict.keys()}
 
-        # Initialize histories
-        self.samples_history = {key: [] for key in self.env_keys}
-        self.buffer_composition_history = {key: [] for key in self.env_keys}
-
-        # New: Track episode timing history and sample ages
+        # Existing tracking for engine-level metrics
         self.episode_times_history = {engine: []
                                       for engine in self.engines_dict.keys()}
         self.sample_ages_history = {engine: []
@@ -36,6 +31,90 @@ class Dashboard:
         self.episode_steps_history = {engine: []
                                       for engine in self.engines_dict.keys()}
         self.type_rewards = {engine: [] for engine in self.engines_dict.keys()}
+
+    def update(self, rewards_history, replay_buffer, episode, episode_dones, stats):
+        # Get sampling distribution
+        sampling_distribution = replay_buffer.get_sampling_distribution()
+
+        print("\n🔍 Sampling Distribution Debug:")
+        print("Sampling Distribution:")
+        for env_id, count in sampling_distribution.items():
+            print(f"  {env_id}: {count} samples")
+
+        # Update samples history by engine type
+        for engine_type in self.samples_history:
+            # Sum samples for this engine type
+            engine_samples = sum(
+                count for env_id, count in sampling_distribution.items()
+                if env_id.startswith(engine_type)
+            )
+
+            # Append total samples for this engine type
+            self.samples_history[engine_type].append(engine_samples)
+
+            print(f"  {engine_type} total samples: {engine_samples}")
+
+        # Rest of the existing update method remains the same
+        buffer_stats = replay_buffer.get_statistics()
+
+        self.type_rewards = stats.get_stats()['type']
+
+        # Update buffer fullness
+        self.buffer_fullness_history.append(buffer_stats['fullness'] * 100)
+        self.last_buffer_stats = buffer_stats
+
+        # Update histories for each instance
+        env_id_counts = replay_buffer.get_env_id_distribution()
+        total_buffer_samples = sum(env_id_counts.values())
+        sampling_distribution = replay_buffer.get_sampling_distribution()
+
+        for engine_type in self.buffer_composition_history:
+            # Find experiences for this engine type
+            engine_experiences = sum(
+                count for env_id, count in env_id_counts.items()
+                if env_id.startswith(engine_type)
+            )
+
+            # Calculate composition percentage
+            composition_percentage = (
+                engine_experiences / total_buffer_samples * 100
+            ) if total_buffer_samples > 0 else 0
+
+            # Update buffer composition history
+            self.buffer_composition_history[engine_type].append(
+                composition_percentage)
+
+        # Update episode timing history
+        if hasattr(stats, 'episode_durations'):
+            for engine_type, durations in stats.episode_durations.items():
+                if durations:
+                    self.episode_times_history[engine_type].append(
+                        durations[-1])
+
+        # Update sample ages from buffer statistics
+        if 'sample_ages' in buffer_stats:
+            for engine_type, age in buffer_stats['sample_ages'].items():
+                self.sample_ages_history[engine_type].append(age)
+
+        if hasattr(stats, 'episode_steps'):
+            for engine_type, steps in stats.episode_steps.items():
+                if steps:
+                    self.episode_steps_history[engine_type].append(steps[-1])
+
+        self.episodes.append(episode)
+
+        # Update all plots
+        self.plot_rewards(rewards_history)
+        self.plot_sampling_composition()
+        self.plot_average_sample_age()
+        self.plot_episode_times()
+        self.plot_buffer_composition()
+        self.plot_buffer_instance_distribution()
+        self.plot_episode_steps()
+        self.plot_rewards_by_engine()
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.pause(0.01)
 
     def plot_rewards(self, rewards_history):
         ax = self.axes[0, 0]
@@ -64,33 +143,78 @@ class Dashboard:
         ax.grid(True)
 
     def plot_sampling_composition(self):
+        """
+        Plot sampling composition with comprehensive debugging
+        """
         ax = self.axes[1, 3]
         ax.cla()
 
-        if any(self.samples_history.values()):
-            engine_samples = {engine: []
-                              for engine in self.engines_dict.keys()}
-            for env_id, samples in self.samples_history.items():
-                engine_type = env_id.split('_')[0]
+        # Debug: Print samples history
+        print("\n🔍 Sampling Composition Debug:")
+        print("Samples History:")
+        for env_id, samples in self.samples_history.items():
+            print(f"  {env_id}: {samples}")
+
+        # Verify sampling history exists
+        if not any(self.samples_history.values()):
+            print("⚠️ No sampling history available!")
+            ax.set_title('Sampling Composition (No Data)')
+            return
+
+        # Aggregate samples by engine type
+        engine_samples = {engine: [] for engine in self.engines_dict.keys()}
+
+        # Collect samples for each engine type
+        for env_id, samples in self.samples_history.items():
+            engine_type = env_id.split('_')[0]
+
+            if engine_type not in engine_samples:
+                print(f"⚠️ Unexpected engine type: {engine_type}")
+                continue
+
+            # If samples list exists, use it
+            if samples:
                 if not engine_samples[engine_type]:
                     engine_samples[engine_type] = samples
                 else:
-                    engine_samples[engine_type] = [sum(x) for x in zip(
-                        engine_samples[engine_type], samples)]
+                    # Sum samples across same engine type
+                    engine_samples[engine_type] = [
+                        sum(x) for x in zip(engine_samples[engine_type], samples)
+                    ]
 
-            total_samples = np.array([sum(s)
-                                     for s in zip(*engine_samples.values())])
-            for engine_type, samples in engine_samples.items():
-                if samples:
-                    sample_percentages = np.divide(samples, total_samples,
-                                                   out=np.zeros_like(
-                                                       samples, dtype=float),
-                                                   where=total_samples != 0) * 100
-                    current_percentage = sample_percentages[-1] if len(
-                        sample_percentages) > 0 else 0
-                    ax.plot(self.episodes, sample_percentages,
-                            label=f'{engine_type} ({current_percentage:.1f}%)',
-                            linewidth=3)
+        # Compute total samples
+        total_samples = np.array([sum(s)
+                                 for s in zip(*engine_samples.values())])
+
+        # Plot sampling composition
+        for engine_type, samples in engine_samples.items():
+            if samples:
+                # Calculate percentages
+                sample_percentages = np.divide(
+                    samples,
+                    total_samples,
+                    out=np.zeros_like(samples, dtype=float),
+                    where=total_samples != 0
+                ) * 100
+
+                # Get current percentage for legend
+                current_percentage = sample_percentages[-1] if len(
+                    sample_percentages) > 0 else 0
+
+                # Debug: Print detailed sampling info
+                print(f"  {engine_type}:")
+                print(f"    Samples: {samples}")
+                print(f"    Percentages: {sample_percentages}")
+                print(f"    Current %: {current_percentage:.2f}")
+
+                # Plot the sampling composition
+                ax.plot(
+                    self.episodes[:len(sample_percentages)],
+                    sample_percentages,
+                    label=f'{engine_type} ({current_percentage:.1f}%)',
+                    linewidth=3
+                )
+
         ax.set_xlabel('Episode')
         ax.set_ylabel('Samples (%)')
         ax.set_title('Sampling Composition by Engine Type')
@@ -219,64 +343,6 @@ class Dashboard:
         ax.legend()
         ax.grid(True)
         ax.set_ylim([0, 100])
-
-    def update(self, rewards_history, replay_buffer, episode, episode_dones, stats):
-        # Get replay buffer statistics
-        buffer_stats = replay_buffer.get_statistics()
-
-        self.type_rewards = stats.get_stats()['type']
-
-        # Update buffer fullness
-        self.buffer_fullness_history.append(buffer_stats['fullness'] * 100)
-        self.last_buffer_stats = buffer_stats
-
-        # Update histories for each instance
-        env_id_counts = replay_buffer.get_env_id_distribution()
-        total_buffer_samples = sum(env_id_counts.values())
-        sampling_distribution = replay_buffer.get_sampling_distribution()
-
-        for env_id in self.samples_history:
-            # Update sampling history
-            count_sampled = sampling_distribution.get(env_id, 0)
-            self.samples_history[env_id].append(count_sampled)
-
-            # Update buffer composition history
-            count_buffer = env_id_counts.get(env_id, 0)
-            composition_percentage = (
-                count_buffer / total_buffer_samples * 100) if total_buffer_samples > 0 else 0
-            self.buffer_composition_history[env_id].append(
-                composition_percentage)
-
-        # Update episode timing history
-        if hasattr(stats, 'episode_durations'):
-            for engine_type, durations in stats.episode_durations.items():
-                if durations:
-                    self.episode_times_history[engine_type].append(
-                        durations[-1])
-
-        # Update sample ages from buffer statistics
-        if 'sample_ages' in buffer_stats:
-            for engine_type, age in buffer_stats['sample_ages'].items():
-                self.sample_ages_history[engine_type].append(age)
-
-        if hasattr(stats, 'episode_steps'):
-            for engine_type, steps in stats.episode_steps.items():
-                if steps:
-                    self.episode_steps_history[engine_type].append(steps[-1])
-        self.episodes.append(episode)
-
-        # Update all plots
-        self.plot_rewards(rewards_history)
-        self.plot_sampling_composition()
-        self.plot_average_sample_age()
-        self.plot_episode_times()
-        self.plot_buffer_composition()
-        self.plot_buffer_instance_distribution()
-        self.plot_episode_steps()
-        self.plot_rewards_by_engine()
-
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.pause(0.01)
 
     def calculate_moving_average(self, data, window_size):
         if len(data) < window_size:

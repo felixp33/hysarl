@@ -7,6 +7,7 @@ from brax_registration import register_brax_envs
 register_brax_envs()  # Register Brax environments with Gymnasium
 
 # Environment specifications
+# Environment specifications for both MuJoCo and Brax
 env_specs = {
     'HalfCheetah': {
         'state_dim': 17,
@@ -22,6 +23,38 @@ env_specs = {
         'engines': {
             'mujoco': 'Ant-v4',
             'brax': 'BraxAnt-v0'
+        }
+    },
+    'Humanoid': {
+        'state_dim': 376,
+        'action_dim': 17,
+        'engines': {
+            'mujoco': 'Humanoid-v4',
+            'brax': 'BraxHumanoid-v0'
+        }
+    },
+    'Walker2D': {
+        'state_dim': 17,
+        'action_dim': 6,
+        'engines': {
+            'mujoco': 'Walker2d-v4',
+            'brax': 'BraxWalker2d-v0'
+        }
+    },
+    'Reacher': {
+        'state_dim': 11,
+        'action_dim': 2,
+        'engines': {
+            'mujoco': 'Reacher-v4',
+            'brax': 'BraxReacher-v0'
+        }
+    },
+    'Hopper': {
+        'state_dim': 11,
+        'action_dim': 3,
+        'engines': {
+            'mujoco': 'Hopper-v4',
+            'brax': 'BraxHopper-v0'
         }
     }
 }
