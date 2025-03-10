@@ -183,3 +183,35 @@ def register_brax_envs():
         print(f"❌ Error registering BraxAnt-v0: {e}")
 
     print("✅ Brax environments registration complete")
+
+    try:
+        print("Registering Brax Hopper...")
+        register(
+            id='BraxHopper-v0',
+            entry_point=lambda: FastBraxEnv('hopper'),
+            max_episode_steps=1000,
+        )
+    except Exception as e:
+        print(f"❌ Error registering BraxHopper-v0: {e}")
+
+    try:
+        print("Registering Brax CartPole...")
+        register(
+            id='BraxCartPole-v0',
+            entry_point=lambda: FastBraxEnv('cartpole'),
+            max_episode_steps=1000,
+        )
+    except Exception as e:
+        print(f"❌ Error registering BraxCartPole-v0: {e}")
+
+    try:
+        print("Registering Brax Pendulum...")
+        register(
+            id='BraxPendulum-v0',
+            entry_point=lambda: FastBraxEnv('pendulum'),
+            max_episode_steps=1000,
+        )
+    except Exception as e:
+        print(f"❌ Error registering BraxPendulum-v0: {e}")
+
+    print("✅ Brax environments registration complete")

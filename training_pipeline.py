@@ -127,20 +127,12 @@ class TrainingPipeline:
 
     def run(self):
         try:
-            print("Entering TrainingPipeline.run() method")
-            print("Number of environments:", self.total_envs)
 
-            print("Checking agent:", self.agent)
-            print("Checking replay buffer:", self.agent.replay_buffer)
-
-            print("Attempting to reset environments")
             states = self.envs.reset()
-            print("Successfully reset environments")
 
             plt.ion()
 
             for episode in range(self.episodes):
-                print(f"Starting episode {episode + 1}/{self.episodes}")
                 states = self.envs.reset()
                 episode_rewards = [0 for _ in range(self.total_envs)]
                 episode_dones = {i: False for i in range(self.total_envs)}
@@ -233,16 +225,11 @@ class TrainingPipeline:
                 )
 
                 if episode % 10 == 0:
-                    print(f"Episode {episode + 1}/{self.episodes}")
                     stats_data = self.stats.get_stats()
                     for engine_type, rewards in stats_data['type'].items():
                         steps = stats_data['episode_steps'][engine_type]
                         avg_duration = np.mean(
                             self.stats.episode_durations[engine_type][-10:])
-                        print(f"{engine_type}:")
-                        print(f"  Mean Reward: {rewards[-1]:.3f}")
-                        print(f"  Mean Steps: {steps[-1]:.1f}")
-                        print(f"  Avg Duration: {avg_duration:.3f}s")
 
         except Exception as e:
             print(f"Error during training: {e}")

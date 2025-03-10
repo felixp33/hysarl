@@ -36,11 +36,6 @@ class Dashboard:
         # Get sampling distribution
         sampling_distribution = replay_buffer.get_sampling_distribution()
 
-        print("\n🔍 Sampling Distribution Debug:")
-        print("Sampling Distribution:")
-        for env_id, count in sampling_distribution.items():
-            print(f"  {env_id}: {count} samples")
-
         # Update samples history by engine type
         for engine_type in self.samples_history:
             # Sum samples for this engine type
@@ -51,8 +46,6 @@ class Dashboard:
 
             # Append total samples for this engine type
             self.samples_history[engine_type].append(engine_samples)
-
-            print(f"  {engine_type} total samples: {engine_samples}")
 
         # Rest of the existing update method remains the same
         buffer_stats = replay_buffer.get_statistics()
@@ -149,15 +142,8 @@ class Dashboard:
         ax = self.axes[1, 3]
         ax.cla()
 
-        # Debug: Print samples history
-        print("\n🔍 Sampling Composition Debug:")
-        print("Samples History:")
-        for env_id, samples in self.samples_history.items():
-            print(f"  {env_id}: {samples}")
-
         # Verify sampling history exists
         if not any(self.samples_history.values()):
-            print("⚠️ No sampling history available!")
             ax.set_title('Sampling Composition (No Data)')
             return
 
@@ -200,12 +186,6 @@ class Dashboard:
                 # Get current percentage for legend
                 current_percentage = sample_percentages[-1] if len(
                     sample_percentages) > 0 else 0
-
-                # Debug: Print detailed sampling info
-                print(f"  {engine_type}:")
-                print(f"    Samples: {samples}")
-                print(f"    Percentages: {sample_percentages}")
-                print(f"    Current %: {current_percentage:.2f}")
 
                 # Plot the sampling composition
                 ax.plot(

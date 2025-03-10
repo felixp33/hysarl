@@ -53,8 +53,6 @@ class CompositionReplayBuffer:
         self.buffer_composition = {k: v/total for k,
                                    v in self.buffer_composition.items()}
 
-        print(f"🔄 Target buffer composition: {self.buffer_composition}")
-
         # Initialize buffers with precise capacity allocation
         self._init_buffers()
 
@@ -70,9 +68,6 @@ class CompositionReplayBuffer:
         """
         Initialize buffers with precise capacity allocation based on buffer composition.
         """
-        print("🏗 Starting buffer initialization...")
-        print(f"🌐 Engine types: {self.engine_types}")
-        print(f"📊 Buffer composition: {self.buffer_composition}")
 
         self.engine_buffers = {}
 
@@ -92,22 +87,8 @@ class CompositionReplayBuffer:
             # Calculate exact capacity for this engine type
             engine_capacity = max(1, int(self.capacity * composition))
 
-            print(f"📦 Allocating {engine_capacity} capacity for {engine_type} "
-                  f"(target: {composition * 100:.2f}%)")
-
             # Create buffer with exact max length
             self.engine_buffers[engine_type] = deque(maxlen=engine_capacity)
-
-        # Verify total allocated capacity
-        total_allocated = sum(
-            buffer.maxlen for buffer in self.engine_buffers.values())
-        print(f"✅ Total allocated capacity: {total_allocated} "
-              f"(Target: {self.capacity})")
-
-        # Adjust for potential rounding errors
-        if total_allocated != self.capacity:
-            print(f"⚠️ Warning: Capacity mismatch. Allocated {total_allocated}, "
-                  f"Target {self.capacity}")
 
     def push(self, state, action, reward, next_state, done, env_id, current_episode):
         """
@@ -120,12 +101,7 @@ class CompositionReplayBuffer:
             engine_type = env_id.split('_')[0]
         elif len(self.engine_buffers) == 1:
             engine_type = list(self.engine_buffers.keys())[0]
-            print(f"   Only one buffer type, using: {engine_type}")
         else:
-            print(
-                f"❌ Error: Cannot determine engine type from env_id '{env_id}'")
-            print(
-                f"   Available engine types: {list(self.engine_buffers.keys())}")
 
             # Force engine type based on known environments
             if any(env in env_id for env in ['mujoco', 'Mujoco']):
@@ -133,13 +109,11 @@ class CompositionReplayBuffer:
             elif any(env in env_id for env in ['brax', 'Brax']):
                 engine_type = 'brax'
             else:
-                print("🚨 Catastrophic error: No valid engine type found!")
                 return  # Early return if no valid engine type
 
         # Validate and correct engine type
         if engine_type not in self.engine_buffers:
-            print(f"⚠️ Warning: Unknown engine type '{engine_type}'. "
-                  f"Using first available type.")
+
             engine_type = list(self.engine_buffers.keys())[0]
 
         # Prepare experience with type conversion
@@ -163,8 +137,6 @@ class CompositionReplayBuffer:
             # If buffer is full, replace oldest experience
             target_buffer.popleft()
             target_buffer.append(experience)
-            print(
-                f"   🔄 Buffer full. Replaced oldest experience in {engine_type} buffer")
 
         # Reset cached composition
         self._last_composition = None
@@ -172,7 +144,7 @@ class CompositionReplayBuffer:
         # Optional: Periodic composition logging
         if current_episode % 50 == 0:
             current_comp = self.get_current_composition()
-            print("📊 Current Buffer Composition:")
+
             for eng, comp in current_comp.items():
                 print(
                     f"{eng}: {comp * 100:.2f}% (buffer size: {len(self.engine_buffers[eng])})")
@@ -204,13 +176,6 @@ class CompositionReplayBuffer:
         Returns:
             Tuple of sampled experiences
         """
-        print("\n🔍 Stratified Sampling Debug:")
-        print(f"Batch Size: {batch_size}")
-        print("Sampling Composition:", self.sampling_composition)
-
-        # Print buffer sizes for each engine type
-        for engine_type, buffer in self.engine_buffers.items():
-            print(f"{engine_type} buffer size: {len(buffer)}")
 
         # Rest of the existing implementation remains the same
         samples = []
@@ -219,13 +184,10 @@ class CompositionReplayBuffer:
         for engine_type, proportion in self.sampling_composition.items():
             # Calculate target number of samples for this engine type
 
-            print(f"\nProcessing {engine_type}:")
             n_samples = max(0, int(proportion * batch_size))
-            print(f"  Target samples: {n_samples}")
             # Ensure the engine type exists in buffers
             if engine_type not in self.engine_buffers:
-                print(
-                    f"⚠️ Warning: Sampling composition includes non-existent engine type '{engine_type}'")
+
                 continue
 
             buffer = self.engine_buffers[engine_type]
@@ -275,11 +237,6 @@ class CompositionReplayBuffer:
             sampling_counts[engine_type] = sampling_counts.get(
                 engine_type, 0) + 1
 
-        total_samples = len(samples)
-        for engine_type, count in sampling_counts.items():
-            print(
-                f"  {engine_type}: {count} samples ({count/total_samples*100:.2f}%)")
-
         # Update sampled counts
         self._update_sampled_counts(samples)
 
@@ -307,13 +264,6 @@ class CompositionReplayBuffer:
             if engine_type not in engine_samples:
                 engine_samples[engine_type] = 0
             engine_samples[engine_type] += 1
-
-        # Optional: Print sampling distribution for debugging
-        print("\n🔍 Sampling Distribution:")
-        total_samples = len(batch)
-        for engine_type, count in engine_samples.items():
-            print(
-                f"  {engine_type}: {count} samples ({count/total_samples*100:.2f}%)")
 
     def _prepare_batch(self, batch: List[Tuple]) -> Tuple:
         """Convert batch to numpy arrays efficiently with correct data types"""
@@ -357,21 +307,13 @@ class CompositionReplayBuffer:
         """
         Calculate current composition with comprehensive debugging.
         """
-        # Detailed buffer size logging
-        print("🔍 Debugging Buffer Composition:")
-        for engine_type, buffer in self.engine_buffers.items():
-            print(
-                f"   {engine_type} buffer size: {len(buffer)} (max: {buffer.maxlen})")
 
         # Calculate current composition with caching
         if self._last_composition is None:
             total_experiences = sum(len(buffer)
                                     for buffer in self.engine_buffers.values())
 
-            print(f"🧮 Total experiences: {total_experiences}")
-
             if total_experiences == 0:
-                print("⚠️ No experiences in buffers!")
                 self._last_composition = {
                     engine: 0.0 for engine in self.engine_types
                 }
@@ -382,14 +324,8 @@ class CompositionReplayBuffer:
                     buffer_size = len(buffer)
                     percentage = buffer_size / total_experiences
                     composition[engine] = percentage
-                    print(
-                        f"   {engine}: {buffer_size} experiences, {percentage * 100:.2f}%")
 
                 self._last_composition = composition
-
-        print("📊 Cached Composition:")
-        for engine, comp in self._last_composition.items():
-            print(f"   {engine}: {comp * 100:.2f}%")
 
         return self._last_composition
 

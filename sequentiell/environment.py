@@ -9,6 +9,23 @@ register_brax_envs()  # Register Brax environments with Gymnasium
 # Environment specifications
 # Environment specifications for both MuJoCo and Brax
 env_specs = {
+
+    'CartPole': {
+        'state_dim': 4,
+        'action_dim': 2,  # Discrete action space for CartPole
+        'engines': {
+            'gym': 'CartPole-v1',  # Using gym since it's not MuJoCo
+            'brax': 'BraxCartPole-v0'
+        }
+    },
+    'Pendulum': {
+        'state_dim': 3,
+        'action_dim': 1,
+        'engines': {
+            'gym': 'Pendulum-v1',  # Using gym since it's not MuJoCo
+            'brax': 'BraxPendulum-v0'
+        }
+    },
     'HalfCheetah': {
         'state_dim': 17,
         'action_dim': 6,
