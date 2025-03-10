@@ -4,16 +4,14 @@ from agents.sac_agent import SACAgent
 import numpy as np
 import torch
 from sequentiell.pipeline import TrainingPipeline
-from sequentiell.environment import env_specs
+from sequentiell.env import env_specs
 import time
+from registration import register_all_envs
 
-# Register Brax environments
-from registration.brax_registration import register_brax_envs
-register_brax_envs()
+import numpy as np
 
-# Register PyBullet environments
-register_pybullet_envs()
 
+register_all_envs()
 # Import agent and replay buffer
 
 if __name__ == "__main__":
