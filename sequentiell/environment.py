@@ -1,18 +1,12 @@
-from registration.pybullet_registration import register_pybullet_envs
-from registration.brax_registration import register_brax_envs
+from registration import register_all_envs
 
 import gymnasium as gym
 import numpy as np
 import time
 
-# Import Brax registration
-register_brax_envs()  # Register Brax environments with Gymnasium
 
+register_all_envs()
 
-# Import PyBullet registration
-register_pybullet_envs()  # Register PyBullet environments
-
-# Environment specifications
 # Environment specifications for MuJoCo, Brax, and PyBullet
 env_specs = {
     'CartPole': {
