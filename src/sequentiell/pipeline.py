@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sequentiell.environment import EnvironmentOrchestrator
-from dashboard import Dashboard
+from src.dashboard import Dashboard
 import time
+
+from src.environment import EnvironmentOrchestrator
 
 
 class TrainingStats:

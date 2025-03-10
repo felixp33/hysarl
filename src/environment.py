@@ -1,4 +1,4 @@
-from registration import register_all_envs
+from src.registration import register_all_envs
 
 import gymnasium as gym
 import numpy as np
