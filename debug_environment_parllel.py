@@ -7,7 +7,7 @@ import os
 import signal
 
 # Import Brax registration
-from brax_registration import register_brax_envs
+from registration.brax_registration import register_brax_envs
 register_brax_envs()  # Register Brax environments with Gymnasium
 
 # Environment specifications

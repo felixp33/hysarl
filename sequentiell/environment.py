@@ -1,15 +1,20 @@
+from registration.pybullet_registration import register_pybullet_envs
+from registration.brax_registration import register_brax_envs
+
 import gymnasium as gym
 import numpy as np
 import time
 
 # Import Brax registration
-from brax_registration import register_brax_envs
 register_brax_envs()  # Register Brax environments with Gymnasium
 
-# Environment specifications
-# Environment specifications for both MuJoCo and Brax
-env_specs = {
 
+# Import PyBullet registration
+register_pybullet_envs()  # Register PyBullet environments
+
+# Environment specifications
+# Environment specifications for MuJoCo, Brax, and PyBullet
+env_specs = {
     'CartPole': {
         'state_dim': 4,
         'action_dim': 2,  # Discrete action space for CartPole
@@ -31,7 +36,8 @@ env_specs = {
         'action_dim': 6,
         'engines': {
             'mujoco': 'HalfCheetah-v4',
-            'brax': 'BraxHalfCheetah-v0'
+            'brax': 'BraxHalfCheetah-v0',
+            'pybullet': 'HalfCheetahBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Ant': {
@@ -39,7 +45,8 @@ env_specs = {
         'action_dim': 8,
         'engines': {
             'mujoco': 'Ant-v4',
-            'brax': 'BraxAnt-v0'
+            'brax': 'BraxAnt-v0',
+            'pybullet': 'AntBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Humanoid': {
@@ -47,7 +54,8 @@ env_specs = {
         'action_dim': 17,
         'engines': {
             'mujoco': 'Humanoid-v4',
-            'brax': 'BraxHumanoid-v0'
+            'brax': 'BraxHumanoid-v0',
+            'pybullet': 'HumanoidBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Walker2D': {
@@ -55,7 +63,8 @@ env_specs = {
         'action_dim': 6,
         'engines': {
             'mujoco': 'Walker2d-v4',
-            'brax': 'BraxWalker2d-v0'
+            'brax': 'BraxWalker2d-v0',
+            'pybullet': 'Walker2DBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Reacher': {
@@ -63,7 +72,8 @@ env_specs = {
         'action_dim': 2,
         'engines': {
             'mujoco': 'Reacher-v4',
-            'brax': 'BraxReacher-v0'
+            'brax': 'BraxReacher-v0',
+            'pybullet': 'ReacherBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Hopper': {
@@ -71,7 +81,8 @@ env_specs = {
         'action_dim': 3,
         'engines': {
             'mujoco': 'Hopper-v4',
-            'brax': 'BraxHopper-v0'
+            'brax': 'BraxHopper-v0',
+            'pybullet': 'HopperBulletEnv-v0'  # Added PyBullet environment
         }
     }
 }
