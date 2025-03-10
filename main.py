@@ -1,18 +1,16 @@
-from registration.pybullet_registration import register_pybullet_envs
-from compostion_buffer import CompositionReplayBuffer
-from agents.sac_agent import SACAgent
+from src.registration import register_all_envs
+from src.compostion_buffer import CompositionReplayBuffer
+from src.agents.sac_agent import SACAgent
+from src.sequentiell.pipeline import TrainingPipeline
+from src.environment import env_specs
+
 import numpy as np
 import torch
-from sequentiell.pipeline import TrainingPipeline
-from sequentiell.env import env_specs
 import time
-from registration import register_all_envs
-
-import numpy as np
 
 
+# Register all environment types
 register_all_envs()
-# Import agent and replay buffer
 
 if __name__ == "__main__":
     # Environment setup for HalfCheetah with all three engines
@@ -21,7 +19,7 @@ if __name__ == "__main__":
     engines = {'mujoco': 1, 'brax': 1, 'pybullet': 1}
 
     # Training parameters
-    buffer_capacity = 100000  # 1M capacity
+    buffer_capacity = 100000  # 100K capacity
     batch_size = 512
     episodes = 500
     steps_per_episode = 1000
@@ -91,8 +89,8 @@ if __name__ == "__main__":
             save_path = f"sac_model_{env_name}.pt"
             sac_agent.save(save_path)
             print(f"✅ Model saved to {save_path}")
-        except:
-            print("⚠️ Could not save model")
+        except Exception as e:
+            print(f"⚠️ Could not save model: {e}")
 
     except KeyboardInterrupt:
         print("\n⚠️ Training interrupted by user")
