@@ -8,6 +8,8 @@ import numpy as np
 import torch
 import time
 
+# Register all environment types
+register_all_envs()
 
 # Register all environment types
 register_all_envs()
@@ -16,7 +18,7 @@ if __name__ == "__main__":
     # Environment setup for HalfCheetah with all three engines
     env_name = 'HalfCheetah'
     # Use one instance of each engine
-    engines = {'mujoco': 1, 'brax': 1, 'pybullet': 1}
+    engines = {'mujoco': 1, 'brax': 1}
 
     # Training parameters
     buffer_capacity = 100000  # 100K capacity
@@ -32,8 +34,8 @@ if __name__ == "__main__":
 
     # Define target compositions for buffer and sampling
     # Balance between engines (adjust as needed)
-    buffer_composition = {'mujoco': 0.6, 'brax': 0.2, 'pybullet': 0.2}
-    sampling_composition = {'mujoco': 0.6, 'brax': 0.2, 'pybullet': 0.2}
+    buffer_composition = {'mujoco': 1, 'brax': 0}
+    sampling_composition = {'mujoco': 1, 'brax': 0}
 
     # Initialize the composition-controlled replay buffer
     composition_buffer = CompositionReplayBuffer(

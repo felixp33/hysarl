@@ -31,7 +31,6 @@ env_specs = {
         'engines': {
             'mujoco': 'HalfCheetah-v4',
             'brax': 'BraxHalfCheetah-v0',
-            'pybullet': 'HalfCheetahBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Ant': {
@@ -40,7 +39,6 @@ env_specs = {
         'engines': {
             'mujoco': 'Ant-v4',
             'brax': 'BraxAnt-v0',
-            'pybullet': 'AntBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Humanoid': {
@@ -49,7 +47,6 @@ env_specs = {
         'engines': {
             'mujoco': 'Humanoid-v4',
             'brax': 'BraxHumanoid-v0',
-            'pybullet': 'HumanoidBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Walker2D': {
@@ -58,7 +55,6 @@ env_specs = {
         'engines': {
             'mujoco': 'Walker2d-v4',
             'brax': 'BraxWalker2d-v0',
-            'pybullet': 'Walker2DBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Reacher': {
@@ -67,7 +63,6 @@ env_specs = {
         'engines': {
             'mujoco': 'Reacher-v4',
             'brax': 'BraxReacher-v0',
-            'pybullet': 'ReacherBulletEnv-v0'  # Added PyBullet environment
         }
     },
     'Hopper': {
@@ -76,7 +71,6 @@ env_specs = {
         'engines': {
             'mujoco': 'Hopper-v4',
             'brax': 'BraxHopper-v0',
-            'pybullet': 'HopperBulletEnv-v0'  # Added PyBullet environment
         }
     }
 }
