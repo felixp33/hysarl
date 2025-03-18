@@ -2,7 +2,7 @@ from src.registration import register_all_envs
 from src.compostion_buffer import CompositionReplayBuffer
 from src.agents.sac_agent import SACAgent
 from src.sequentiell.pipeline import TrainingPipeline
-from src.environment import env_specs
+from src.environment_orchestrator import env_specs
 
 import numpy as np
 import torch

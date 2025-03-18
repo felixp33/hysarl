@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from debug_environment_parllel import EnvironmentOrchestrator
+from src.environment_worker import EnvironmentOrchestrator
 from dashboard import Dashboard
 import time
 from replay_buffer import ReplayBuffer  # if needed

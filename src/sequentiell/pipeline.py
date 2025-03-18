@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from src.dashboard import Dashboard
 import time
 
-from src.environment import EnvironmentOrchestrator
+from src.environment_orchestrator import EnvironmentOrchestrator
 
 
 class TrainingStats:
