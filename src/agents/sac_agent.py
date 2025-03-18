@@ -140,6 +140,7 @@ class SACAgent:
         self.actor_loss_history = []
         self.alpha_loss_history = []
         self.entropy_history = []
+        self.td_error_history = []
 
     def select_action(self, state, evaluate=False):
         """Select action with warm-up exploration and proper noise handling."""
@@ -228,6 +229,10 @@ class SACAgent:
                 (1 - dones) * self.gamma * (q_next -
                                             self.alpha * next_log_probs.view(-1, 1))
 
+            td_errors = torch.abs(
+                target_q - current_q1).cpu().numpy().flatten()
+            self.td_error_history.append(td_errors.mean())
+
         # ✅ Ensure `target_q` has correct shape `[batch_size, 1]`
         target_q = target_q.view(batch_size, 1).to(torch.float32)
 
@@ -309,7 +314,7 @@ class SACAgent:
             'actor_loss': np.mean(self.actor_loss_history[-100:]),
             'alpha_loss': np.mean(self.alpha_loss_history[-100:]),
             'entropy': np.mean(self.entropy_history[-100:]),
-            'alpha': self.alpha.item(),
+            'td_error': np.mean(self.td_error_history[-100:]),
             'total_steps': self.total_steps,
             'exploration_status': self.get_exploration_status()
         }
@@ -344,10 +349,11 @@ class SACAgent:
                 'actor_optimizer_state_dict': self.actor_optimizer.state_dict(),
                 'critic1_optimizer_state_dict': self.critic1_optimizer.state_dict(),
                 'critic2_optimizer_state_dict': self.critic2_optimizer.state_dict(),
-                'log_alpha': self.log_alpha,
                 'alpha_optimizer_state_dict': self.alpha_optimizer.state_dict(),
                 'total_steps': self.total_steps,
-                'train_iteration': self.train_iteration
+                'train_iteration': self.train_iteration,
+                'td_error_history': self.td_error_history,
+
             }, path)
         except Exception as e:
             print(f"Error saving model: {e}")

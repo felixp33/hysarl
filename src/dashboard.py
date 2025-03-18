@@ -31,10 +31,15 @@ class Dashboard:
         self.episode_steps_history = {engine: []
                                       for engine in self.engines_dict.keys()}
         self.type_rewards = {engine: [] for engine in self.engines_dict.keys()}
+        self.td_error_history = []
 
     def update(self, rewards_history, replay_buffer, episode, episode_dones, stats):
         # Get sampling distribution
         sampling_distribution = replay_buffer.get_sampling_distribution()
+        print(agent_diagnostics)
+        agent_diagnostics = stats.get('agent_diagnostics', {})
+        if 'td_error' in agent_diagnostics:
+            self.td_error_history.append(agent_diagnostics['td_error'])
 
         # Update samples history by engine type
         for engine_type in self.samples_history:
@@ -424,5 +429,32 @@ class Dashboard:
         ax.set_xlabel('Episode')
         ax.set_ylabel('Reward')
         ax.set_title('Average Reward by Engine Type')
+        ax.legend()
+        ax.grid(True)
+
+    # In dashboard.py, add this method:
+
+    def plot_td_error(self):
+        """Plot TD error over episodes"""
+        ax = self.axes[0, 3]  # You may need to adjust which subplot to use
+        ax.cla()
+
+        if self.td_error_history:
+            ax.plot(self.episodes, self.td_error_history,
+                    label='TD Error', color='purple', linewidth=2)
+
+            # Add moving average if we have enough data
+            if len(self.td_error_history) >= self.short_window:
+                short_ma = self.calculate_moving_average(
+                    self.td_error_history, self.short_window)
+                short_ma_episodes = np.arange(
+                    self.short_window - 1, len(self.td_error_history))
+                ax.plot(short_ma_episodes, short_ma,
+                        label=f'{self.short_window}-Episode MA',
+                        color='magenta', linewidth=2)
+
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('TD Error')
+        ax.set_title('TD Error over Episodes')
         ax.legend()
         ax.grid(True)

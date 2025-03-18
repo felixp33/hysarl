@@ -171,6 +171,13 @@ class TrainingPipeline:
                 self.stats.update_steps(episode_steps)
                 self.stats.compute_episode_durations()
 
+                # Get agent diagnostics
+                agent_diagnostics = self.agent.get_diagnostics()
+
+                # Update stats with agent diagnostics
+                stats_data = self.stats.get_stats()
+                stats_data['agent_diagnostics'] = agent_diagnostics
+
                 # Update dashboard
                 self.dashboard.update(
                     self.rewards_history,

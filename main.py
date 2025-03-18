@@ -13,7 +13,7 @@ register_all_envs()
 
 if __name__ == "__main__":
     # Environment setup for HalfCheetah with all three engines
-    env_name = 'Walker2D'
+    env_name = 'HalfCheetah'
     # Use one instance of each engine
     engines = {'mujoco': 1, 'brax': 1}
 
