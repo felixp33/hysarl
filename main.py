@@ -45,10 +45,6 @@ if __name__ == "__main__":
         warmup_steps=10000   # Exploration phase
     )
 
-    # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
-
     # Initialize the sequential training pipeline
     pipeline = TrainingPipeline(
         env_name=env_name,

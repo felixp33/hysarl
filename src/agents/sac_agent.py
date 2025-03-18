@@ -199,11 +199,9 @@ class SACAgent:
             self.alpha = torch.max(
                 self.alpha, torch.tensor(0.2).to(self.device))
 
-        # Sample from replay buffer
         states, actions, rewards, next_states, dones, _ = self.replay_buffer.sample(
             batch_size)
 
-        # ✅ Fix float64-to-float32 conversion
         states = torch.tensor(states, dtype=torch.float32, device=self.device)
         actions = torch.tensor(
             actions, dtype=torch.float32, device=self.device)
@@ -220,18 +218,12 @@ class SACAgent:
             q1_next = self.critic1_target(next_states, next_actions)
             q2_next = self.critic2_target(next_states, next_actions)
 
-            # ✅ Ensure correct shapes by taking `min()` without extra dimensions
             q_next = torch.min(q1_next, q2_next).view(-1, 1)
 
-            # ✅ Clamp rewards and fix shape mismatch
             rewards_clamped = torch.clamp(rewards, -100, 100).view(-1, 1)
             target_q = rewards_clamped + \
                 (1 - dones) * self.gamma * (q_next -
                                             self.alpha * next_log_probs.view(-1, 1))
-
-            td_errors = torch.abs(
-                target_q - current_q1).cpu().numpy().flatten()
-            self.td_error_history.append(td_errors.mean())
 
         # ✅ Ensure `target_q` has correct shape `[batch_size, 1]`
         target_q = target_q.view(batch_size, 1).to(torch.float32)
@@ -239,6 +231,9 @@ class SACAgent:
         # Compute critic losses
         current_q1 = self.critic1(states, actions)
         current_q2 = self.critic2(states, actions)
+        td_errors = torch.abs(
+            target_q - current_q1).detach().cpu().numpy().flatten()
+        self.td_error_history.append(td_errors.mean())
 
         # ✅ Fix shape mismatch for critic loss
         assert current_q1.shape == target_q.shape, f"Shape mismatch: {current_q1.shape} vs {target_q.shape}"

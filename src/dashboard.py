@@ -36,10 +36,6 @@ class Dashboard:
     def update(self, rewards_history, replay_buffer, episode, episode_dones, stats):
         # Get sampling distribution
         sampling_distribution = replay_buffer.get_sampling_distribution()
-        print(agent_diagnostics)
-        agent_diagnostics = stats.get('agent_diagnostics', {})
-        if 'td_error' in agent_diagnostics:
-            self.td_error_history.append(agent_diagnostics['td_error'])
 
         # Update samples history by engine type
         for engine_type in self.samples_history:
@@ -99,6 +95,8 @@ class Dashboard:
                 if steps:
                     self.episode_steps_history[engine_type].append(steps[-1])
 
+        self.td_error_history = stats.get_stats()['td_errors']
+
         self.episodes.append(episode)
 
         # Update all plots
@@ -107,9 +105,9 @@ class Dashboard:
         self.plot_average_sample_age()
         self.plot_episode_times()
         self.plot_buffer_composition()
-        self.plot_buffer_instance_distribution()
         self.plot_episode_steps()
         self.plot_rewards_by_engine()
+        self.plot_td_error()
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.pause(0.01)
@@ -435,20 +433,82 @@ class Dashboard:
     # In dashboard.py, add this method:
 
     def plot_td_error(self):
-        """Plot TD error over episodes"""
-        ax = self.axes[0, 3]  # You may need to adjust which subplot to use
+        """Plot TD error over episodes with individual points and trend line"""
+        ax = self.axes[1, 1]
         ax.cla()
 
-        if self.td_error_history:
-            ax.plot(self.episodes, self.td_error_history,
-                    label='TD Error', color='purple', linewidth=2)
+        # Check if td_error_history exists and is not empty
+        if not self.td_error_history or len(self.td_error_history) == 0:
+            ax.set_title('TD Error over Episodes (No Data)')
+            ax.set_xlabel('Episode')
+            ax.set_ylabel('TD Error')
+            ax.grid(True)
+            return
+
+        # Simple case: one average TD error value per episode
+        if isinstance(self.td_error_history[0], (int, float, np.number)):
+            # Make sure we have the same number of episodes and TD errors
+            min_len = min(len(self.episodes), len(self.td_error_history))
+
+            ax.plot(self.episodes[:min_len], self.td_error_history[:min_len],
+                    label='Mean TD Error', color='purple', linewidth=2)
 
             # Add moving average if we have enough data
-            if len(self.td_error_history) >= self.short_window:
+            if min_len >= self.short_window:
                 short_ma = self.calculate_moving_average(
-                    self.td_error_history, self.short_window)
+                    self.td_error_history[:min_len], self.short_window)
                 short_ma_episodes = np.arange(
-                    self.short_window - 1, len(self.td_error_history))
+                    self.short_window - 1, min_len)
+                ax.plot(short_ma_episodes, short_ma,
+                        label=f'{self.short_window}-Episode MA',
+                        color='magenta', linewidth=2)
+
+        # If you've been appending arrays or lists, we need to handle differently
+        elif isinstance(self.td_error_history[0], (list, np.ndarray)):
+            # Calculate episode-wise means for the line plot
+            episode_means = []
+            for errors in self.td_error_history:
+                if len(errors) > 0:
+                    episode_means.append(float(np.mean(errors)))
+                else:
+                    episode_means.append(0.0)  # Handle empty arrays
+
+            # Make sure we have the same number of episodes and means
+            min_len = min(len(self.episodes), len(episode_means))
+
+            # Plot the line of means
+            ax.plot(self.episodes[:min_len], episode_means[:min_len],
+                    label='Mean TD Error', color='purple', linewidth=2)
+
+            # For scatter plot, we need to flatten everything
+            all_points_x = []
+            all_points_y = []
+
+            for episode_idx, errors in enumerate(self.td_error_history[:min_len]):
+                if len(errors) == 0:
+                    continue  # Skip empty arrays
+
+                # Convert episode index to float for jitter operation
+                episode_x = np.full(len(errors), float(
+                    self.episodes[episode_idx]))
+                episode_x = episode_x + \
+                    np.random.normal(0, 0.1, len(errors))  # Small jitter
+
+                all_points_x.extend(episode_x)
+                all_points_y.extend(errors)
+
+            # Only plot scatter if we have points to plot
+            if len(all_points_x) > 0:
+                # Plot individual points with low alpha for density visualization
+                ax.scatter(all_points_x, all_points_y, alpha=0.1, color='blue',
+                           s=5, label='Individual Errors')
+
+            # Add moving average if we have enough data
+            if min_len >= self.short_window:
+                short_ma = self.calculate_moving_average(
+                    episode_means[:min_len], self.short_window)
+                short_ma_episodes = np.arange(
+                    self.short_window - 1, min_len)
                 ax.plot(short_ma_episodes, short_ma,
                         label=f'{self.short_window}-Episode MA',
                         color='magenta', linewidth=2)
