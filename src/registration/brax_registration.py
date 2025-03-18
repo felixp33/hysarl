@@ -161,57 +161,30 @@ def register_brax_envs():
     second_step = time.time() - start
     print(f"Second step took {second_step:.3f}s (should be much faster)")
 
-    # Register the environments
-    try:
-        print("Registering Brax HalfCheetah...")
-        register(
-            id='BraxHalfCheetah-v0',
-            entry_point=lambda: FastBraxEnv('halfcheetah'),
-            max_episode_steps=1000,
-        )
-    except Exception as e:
-        print(f"❌ Error registering BraxHalfCheetah-v0: {e}")
+    # Map of Brax environment names to their Gymnasium registration IDs
+    brax_env_mapping = {
+        'halfcheetah': 'BraxHalfCheetah-v0',
+        'ant': 'BraxAnt-v0',
+        'humanoid': 'BraxHumanoid-v0',
+        'walker2d': 'BraxWalker2d-v0',
+        'hopper': 'BraxHopper-v0',
+        'reacher': 'BraxReacher-v0',
+        'cartpole': 'BraxCartPole-v0',
+        'pendulum': 'BraxPendulum-v0',
+        # Add any other Brax environments here
+    }
 
-    try:
-        print("Registering Brax Ant...")
-        register(
-            id='BraxAnt-v0',
-            entry_point=lambda: FastBraxEnv('ant'),
-            max_episode_steps=1000,
-        )
-    except Exception as e:
-        print(f"❌ Error registering BraxAnt-v0: {e}")
-
-    print("✅ Brax environments registration complete")
-
-    try:
-        print("Registering Brax Hopper...")
-        register(
-            id='BraxHopper-v0',
-            entry_point=lambda: FastBraxEnv('hopper'),
-            max_episode_steps=1000,
-        )
-    except Exception as e:
-        print(f"❌ Error registering BraxHopper-v0: {e}")
-
-    try:
-        print("Registering Brax CartPole...")
-        register(
-            id='BraxCartPole-v0',
-            entry_point=lambda: FastBraxEnv('cartpole'),
-            max_episode_steps=1000,
-        )
-    except Exception as e:
-        print(f"❌ Error registering BraxCartPole-v0: {e}")
-
-    try:
-        print("Registering Brax Pendulum...")
-        register(
-            id='BraxPendulum-v0',
-            entry_point=lambda: FastBraxEnv('pendulum'),
-            max_episode_steps=1000,
-        )
-    except Exception as e:
-        print(f"❌ Error registering BraxPendulum-v0: {e}")
+    # Register all environments
+    for brax_name, gym_id in brax_env_mapping.items():
+        try:
+            print(f"Registering {gym_id}...")
+            register(
+                id=gym_id,
+                entry_point=lambda env_name=brax_name: FastBraxEnv(env_name),
+                max_episode_steps=1000,
+            )
+            print(f"✅ Successfully registered {gym_id}")
+        except Exception as e:
+            print(f"❌ Error registering {gym_id}: {e}")
 
     print("✅ Brax environments registration complete")

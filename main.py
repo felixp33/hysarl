@@ -11,38 +11,22 @@ import time
 # Register all environment types
 register_all_envs()
 
-# Register all environment types
-register_all_envs()
-
 if __name__ == "__main__":
     # Environment setup for HalfCheetah with all three engines
-    env_name = 'HalfCheetah'
+    env_name = 'Walker2D'
     # Use one instance of each engine
     engines = {'mujoco': 1, 'brax': 1}
-
-    # Training parameters
-    buffer_capacity = 100000  # 100K capacity
-    batch_size = 512
-    episodes = 500
-    steps_per_episode = 1000
 
     # Fetch dimensions from environment specs
     state_dim = env_specs[env_name]['state_dim']
     action_dim = env_specs[env_name]['action_dim']
-    print(
-        f"Running {env_name} experiment with state_dim={state_dim}, action_dim={action_dim}")
-
-    # Define target compositions for buffer and sampling
-    # Balance between engines (adjust as needed)
-    buffer_composition = {'mujoco': 1, 'brax': 0}
-    sampling_composition = {'mujoco': 1, 'brax': 0}
 
     # Initialize the composition-controlled replay buffer
     composition_buffer = CompositionReplayBuffer(
-        capacity=buffer_capacity,
+        capacity=100000,
         strategy='stratified',  # Use stratified sampling
-        sampling_composition=sampling_composition,
-        buffer_composition=buffer_composition,
+        sampling_composition={'mujoco': 0.5, 'brax': 0.5},
+        buffer_composition={'mujoco': 0.5, 'brax': 0.5},
         engine_counts=engines  # Provide engine counts for initialization
     )
 
@@ -54,7 +38,7 @@ if __name__ == "__main__":
         hidden_dim=512,      # Larger network for complex control
         lr=3e-4,             # Standard learning rate for SAC
         gamma=0.99,          # Standard discount factor
-        tau=0.01,            # Soft target update rate
+        tau=0.005,            # Soft target update rate
         alpha=0.3,           # Initial temperature parameter
         target_entropy=-action_dim,  # Heuristic for continuous control
         grad_clip=1.0,       # Prevent exploding gradients
@@ -69,10 +53,10 @@ if __name__ == "__main__":
     pipeline = TrainingPipeline(
         env_name=env_name,
         engines_dict=engines,
-        buffer_capacity=buffer_capacity,
-        batch_size=batch_size,
-        episodes=episodes,
-        steps_per_episode=steps_per_episode,
+        buffer_capacity=100000,
+        batch_size=512,
+        episodes=500,
+        steps_per_episode=1000,
         agent=sac_agent
     )
 
