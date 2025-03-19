@@ -225,7 +225,6 @@ class SACAgent:
                 (1 - dones) * self.gamma * (q_next -
                                             self.alpha * next_log_probs.view(-1, 1))
 
-        # ✅ Ensure `target_q` has correct shape `[batch_size, 1]`
         target_q = target_q.view(batch_size, 1).to(torch.float32)
 
         # Compute critic losses
@@ -234,10 +233,6 @@ class SACAgent:
         td_errors = torch.abs(
             target_q - current_q1).detach().cpu().numpy().flatten()
         self.td_error_history.append(td_errors.mean())
-
-        # ✅ Fix shape mismatch for critic loss
-        assert current_q1.shape == target_q.shape, f"Shape mismatch: {current_q1.shape} vs {target_q.shape}"
-        assert current_q2.shape == target_q.shape, f"Shape mismatch: {current_q2.shape} vs {target_q.shape}"
 
         critic1_loss = F.huber_loss(current_q1, target_q)
         critic2_loss = F.huber_loss(current_q2, target_q)

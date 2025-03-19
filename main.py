@@ -23,11 +23,12 @@ if __name__ == "__main__":
 
     # Initialize the composition-controlled replay buffer
     composition_buffer = CompositionReplayBuffer(
-        capacity=100000,
+        capacity=1000000,
         strategy='stratified',  # Use stratified sampling
         sampling_composition={'mujoco': 0.5, 'brax': 0.5},
         buffer_composition={'mujoco': 0.5, 'brax': 0.5},
-        engine_counts=engines  # Provide engine counts for initialization
+        engine_counts=engines,
+        recency_bias=2.0
     )
 
     # Initialize SAC agent with optimal parameters for HalfCheetah
@@ -35,21 +36,21 @@ if __name__ == "__main__":
         state_dim=state_dim,
         action_dim=action_dim,
         replay_buffer=composition_buffer,
-        hidden_dim=512,      # Larger network for complex control
-        lr=3e-4,             # Standard learning rate for SAC
-        gamma=0.99,          # Standard discount factor
-        tau=0.005,            # Soft target update rate
-        alpha=0.3,           # Initial temperature parameter
-        target_entropy=-action_dim,  # Heuristic for continuous control
-        grad_clip=1.0,       # Prevent exploding gradients
-        warmup_steps=10000   # Exploration phase
+        hidden_dim=256,
+        lr=3e-4,
+        gamma=0.99,
+        tau=0.005,
+        alpha=0.2,
+        target_entropy=-action_dim,
+        grad_clip=1.0,
+        warmup_steps=5000
     )
 
     # Initialize the sequential training pipeline
     pipeline = TrainingPipeline(
         env_name=env_name,
         engines_dict=engines,
-        buffer_capacity=100000,
+        buffer_capacity=500000,
         batch_size=512,
         episodes=500,
         steps_per_episode=1000,

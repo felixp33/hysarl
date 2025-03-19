@@ -8,6 +8,7 @@ class CompositionReplayBuffer:
     def __init__(self,
                  capacity: int,
                  strategy: str = 'uniform',
+                 recency_bias: float = 0.0,
                  sampling_composition: Optional[Dict[str, float]] = None,
                  buffer_composition: Optional[Dict[str, float]] = None,
                  engine_counts: Optional[Dict[str, int]] = None):
@@ -63,6 +64,7 @@ class CompositionReplayBuffer:
         self.position = 0
         self._total_samples = 0
         self._last_composition = None
+        self.recency_bias = recency_bias
 
     def _init_buffers(self):
         """
@@ -166,6 +168,30 @@ class CompositionReplayBuffer:
         else:
             raise ValueError(f"Unknown sampling strategy: {self.strategy}")
 
+    def recency_biased_sampling(self, batch_size):
+        """Sample with bias toward recent experiences using buffer position"""
+        if len(self.buffer) < batch_size:
+            # Not enough samples, return all we have
+            return self._prepare_batch(list(self.buffer))
+
+        buffer_size = len(self.buffer)
+
+        # Generate indices with a skewed distribution favoring recent entries
+        indices = []
+        for _ in range(batch_size):
+
+            alpha = 3.0
+            r = np.random.random()
+            skewed_value = r ** alpha
+
+            relative_idx = int(skewed_value * buffer_size)
+
+            actual_idx = (self.position - 1 - relative_idx) % buffer_size
+            indices.append(actual_idx)
+
+        samples = [self.buffer[i] for i in indices]
+        return self._prepare_batch(samples)
+
     def stratified_sampling(self, batch_size: int) -> Tuple:
         """
         Perform stratified sampling with precise proportion control.
@@ -194,11 +220,8 @@ class CompositionReplayBuffer:
 
             # Sample from this engine's buffer
             if buffer and n_samples > 0:
-                # Ensure we don't sample more than available experiences
-                actual_samples = min(n_samples, len(buffer))
-
-                # Randomly sample from buffer
-                buffer_samples = random.sample(list(buffer), actual_samples)
+                buffer_samples = self._recency_biased_sample_from_buffer(
+                    buffer, n_samples)
                 samples.extend(buffer_samples)
 
         # Fill remaining batch size if needed
@@ -403,3 +426,30 @@ class CompositionReplayBuffer:
     def __len__(self) -> int:
         """Get total number of experiences."""
         return sum(len(buffer) for buffer in self.engine_buffers.values())
+
+    def _recency_biased_sample_from_buffer(self, buffer, sample_size):
+        """Sample with bias toward recent experiences from a specific buffer"""
+        if not buffer or sample_size <= 0:
+            return []
+
+        buffer_list = list(buffer)
+        buffer_size = len(buffer_list)
+
+        if self.recency_bias <= 0.001 or buffer_size <= sample_size:
+            # No recency bias or small buffer - use simple random sampling
+            return random.sample(buffer_list, min(sample_size, buffer_size))
+
+        # Generate indices with a skewed distribution favoring recent entries
+        indices = []
+        for _ in range(sample_size):
+            # Use recency_bias as the alpha parameter for the power distribution
+            r = np.random.random()
+            skewed_value = r ** self.recency_bias
+
+            # Map to an index, with recent items having higher probability
+            idx = int(skewed_value * buffer_size)
+            indices.append(buffer_size - 1 - idx)  # Reverse to get most recent
+
+        # Get samples (handle index bounds)
+        indices = [max(0, min(i, buffer_size-1)) for i in indices]
+        return [buffer_list[i] for i in indices]
