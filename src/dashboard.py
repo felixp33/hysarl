@@ -270,6 +270,7 @@ class Dashboard:
             f'Episode Time by Engine Type ({window_size}-Episode Moving Average)')
         ax.legend()
         ax.grid(True)
+        ax.set_yscale('log')
 
     def plot_buffer_composition(self):
         ax = self.axes[1, 0]

@@ -15,7 +15,7 @@ def initialize_weights(module, gain=1):
 
 
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim=256, log_std_min=-5, log_std_max=2):
+    def __init__(self, state_dim, action_dim, hidden_dim=256, log_std_min=-5, log_std_max=3):
         super().__init__()
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
@@ -162,20 +162,7 @@ class SACAgent:
                         )
                     )
                 else:
-                    # Regular SAC sampling
-                    # Actor outputs tanh-squashed action
-                    raw_action, _ = self.actor.sample(state)
-
-                    # Apply noise BEFORE tanh (to avoid going out of bounds)
-                    noise_scale = max(0.0, self.initial_noise_scale *
-                                      (1.0 - self.total_steps / (2 * self.warmup_steps)))
-                    if noise_scale > 0:
-                        noise = torch.normal(
-                            mean=0.0, std=noise_scale, size=raw_action.shape, device=self.device)
-                        raw_action += noise
-
-                    # Apply tanh again for final squashing
-                    action = torch.tanh(raw_action)
+                    action, _ = self.actor.sample(state)
 
             return action.cpu().numpy()[0]
 
@@ -232,6 +219,9 @@ class SACAgent:
         current_q2 = self.critic2(states, actions)
         td_errors = torch.abs(
             target_q - current_q1).detach().cpu().numpy().flatten()
+        td_errors_2 = torch.abs(
+            target_q - current_q2).detach().cpu().numpy().flatten()
+
         self.td_error_history.append(td_errors.mean())
 
         critic1_loss = F.huber_loss(current_q1, target_q)

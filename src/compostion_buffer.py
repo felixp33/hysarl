@@ -168,30 +168,6 @@ class CompositionReplayBuffer:
         else:
             raise ValueError(f"Unknown sampling strategy: {self.strategy}")
 
-    def recency_biased_sampling(self, batch_size):
-        """Sample with bias toward recent experiences using buffer position"""
-        if len(self.buffer) < batch_size:
-            # Not enough samples, return all we have
-            return self._prepare_batch(list(self.buffer))
-
-        buffer_size = len(self.buffer)
-
-        # Generate indices with a skewed distribution favoring recent entries
-        indices = []
-        for _ in range(batch_size):
-
-            alpha = 3.0
-            r = np.random.random()
-            skewed_value = r ** alpha
-
-            relative_idx = int(skewed_value * buffer_size)
-
-            actual_idx = (self.position - 1 - relative_idx) % buffer_size
-            indices.append(actual_idx)
-
-        samples = [self.buffer[i] for i in indices]
-        return self._prepare_batch(samples)
-
     def stratified_sampling(self, batch_size: int) -> Tuple:
         """
         Perform stratified sampling with precise proportion control.

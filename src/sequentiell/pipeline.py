@@ -71,7 +71,7 @@ class TrainingPipeline:
                         f"  {engine_type}: Reward = {reward:.2f}, Steps = {steps}")
 
                     # Train the agent multiple times after each environment episode
-                    train_iterations = steps // 10  # Adjust this multiplier as needed
+                    train_iterations = steps // 1
                     print(f"  Training iterations: {train_iterations}")
                     self.agent.td_error_history = []
                     for _ in range(train_iterations):
@@ -131,5 +131,6 @@ class TrainingPipeline:
             traceback.print_exc()
             raise
         finally:
+            self.stats.export_to_csv()
             self.envs.close()
             self.dashboard.close()

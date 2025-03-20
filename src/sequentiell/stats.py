@@ -1,3 +1,8 @@
+from datetime import datetime
+import numpy as np
+import pandas as pd
+import os
+import csv
 import time
 
 
@@ -86,3 +91,76 @@ class TrainingStats:
         self.td_errors.append(td_errors)
         print("Length of TD errors: ", len(self.td_errors))
         print("TD errors total: ", sum(len(l) for l in self.td_errors))
+
+    def export_to_csv(self, output_dir='logs', filename=None):
+        """
+        Export ALL collected training statistics to CSV files with complete history.
+
+        Args:
+            output_dir (str): Directory to save CSV files
+            filename (str, optional): Base filename. If None, a timestamp will be used
+        """
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Generate timestamp for filename if not provided
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"training_stats_{timestamp}"
+
+        # Export each type of data to its own CSV file
+
+        # 1. Export rewards
+        rewards_df = pd.DataFrame()
+        for engine, rewards in self.type_rewards.items():
+            rewards_df[f"{engine}_reward"] = pd.Series(rewards)
+        rewards_df.to_csv(
+            f"{output_dir}/{filename}_rewards.csv", index_label='episode')
+
+        # 2. Export episode durations
+        durations_df = pd.DataFrame()
+        for engine, durations in self.episode_durations.items():
+            durations_df[f"{engine}_duration"] = pd.Series(durations)
+        durations_df.to_csv(
+            f"{output_dir}/{filename}_durations.csv", index_label='episode')
+
+        # 3. Export step times (raw step timing data)
+        step_times_df = pd.DataFrame()
+        for engine, times in self.step_times.items():
+            step_times_df[f"{engine}_step_times"] = pd.Series(times)
+        step_times_df.to_csv(
+            f"{output_dir}/{filename}_step_times.csv", index_label='step')
+
+        # 4. Export episode steps
+        steps_df = pd.DataFrame()
+        for engine, steps in self.episode_steps.items():
+            steps_df[f"{engine}_steps"] = pd.Series(steps)
+        steps_df.to_csv(f"{output_dir}/{filename}_steps.csv",
+                        index_label='episode')
+
+        # 5. Export instance rewards
+        instance_df = pd.DataFrame()
+        for instance_id, rewards in self.instance_rewards.items():
+            instance_df[f"instance_{instance_id}_reward"] = pd.Series(rewards)
+        instance_df.to_csv(
+            f"{output_dir}/{filename}_instance_rewards.csv", index_label='episode')
+
+        # 6. Export TD errors - handling the nested list structure
+        if self.td_errors:
+            # Flatten the nested list structure
+            episode_indices = []
+            flattened_td_errors = []
+
+            for episode_idx, errors_list in enumerate(self.td_errors):
+                for error in errors_list:
+                    episode_indices.append(episode_idx)
+                    flattened_td_errors.append(error)
+
+            td_df = pd.DataFrame({
+                'episode': episode_indices,
+                'td_error': flattened_td_errors
+            })
+            td_df.to_csv(f"{output_dir}/{filename}_td_errors.csv", index=False)
+
+        print(
+            f"✅ All training statistics exported to {output_dir}/{filename}_*.csv")
