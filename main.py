@@ -26,8 +26,8 @@ if __name__ == "__main__":
     composition_buffer = CompositionReplayBuffer(
         capacity=buffer_capacity,
         strategy='stratified',
-        sampling_composition={'mujoco': 0.3, 'brax': 0.7},
-        buffer_composition={'mujoco': 0.3, 'brax': 0.7},
+        sampling_composition={'mujoco': 0.7, 'brax': 0.3},
+        buffer_composition={'mujoco': 0.7, 'brax': 0.3},
         engine_counts=engines,
         recency_bias=3.0
     )
