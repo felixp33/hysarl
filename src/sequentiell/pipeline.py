@@ -51,7 +51,6 @@ class TrainingPipeline:
 
                 # Run one episode for each engine type
                 for engine_type in self.engines_dict.keys():
-                    print(f"  Training on {engine_type}...")
 
                     # Run episode for this engine
                     reward, steps, done = self.envs.run_episode(

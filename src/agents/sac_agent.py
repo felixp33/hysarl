@@ -190,7 +190,6 @@ class SACAgent:
 
         # Skip training during pure exploration phase
         if self.total_steps < self.warmup_steps // 2:
-            print("⏳ Still in pure exploration phase")
             return
 
         self.train_iteration += 1

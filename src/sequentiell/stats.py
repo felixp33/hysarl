@@ -86,11 +86,8 @@ class TrainingStats:
         }
 
     def update_td_errors(self, td_errors):
-        print("new TD errors len : ", len(td_errors))
         """Update TD errors for each training step"""
         self.td_errors.append(td_errors)
-        print("Length of TD errors: ", len(self.td_errors))
-        print("TD errors total: ", sum(len(l) for l in self.td_errors))
 
     def export_to_csv(self, output_dir='logs', filename=None):
         """
