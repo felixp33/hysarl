@@ -7,7 +7,7 @@ from src.sequentiell.stats import TrainingStats
 
 
 class TrainingPipeline:
-    def __init__(self, env_name, engines_dict, buffer_capacity, batch_size, episodes, steps_per_episode, agent):
+    def __init__(self, env_name, engines_dict, buffer_capacity, batch_size, episodes, steps_per_episode, agent, engine_dropout=None, drop_out_limit=None):
         self.env_name = env_name
         self.engines_dict = engines_dict
         self.total_envs = sum(engines_dict.values())
@@ -20,6 +20,8 @@ class TrainingPipeline:
         self.rewards_history = []
         self.agent = agent
         self.stats = TrainingStats(engines_dict)
+        self.engine_dropout = engine_dropout
+        self.drop_out_limit = drop_out_limit
 
         # Setup dashboard
         self.dashboard = Dashboard(
@@ -29,7 +31,9 @@ class TrainingPipeline:
              'Buffer Capacity': buffer_capacity,
              'Batch Size': batch_size,
              'Episodes': episodes,
-             'Steps per Episode': steps_per_episode}
+             'Steps per Episode': steps_per_episode,
+             'Agent': agent.get_config(),
+             }
         )
 
     def run(self):
@@ -71,12 +75,26 @@ class TrainingPipeline:
                         f"  {engine_type}: Reward = {reward:.2f}, Steps = {steps}")
 
                     # Train the agent multiple times after each environment episode
-                    train_iterations = steps // 1
-                    print(f"  Training iterations: {train_iterations}")
-                    self.agent.td_error_history = []
-                    for _ in range(train_iterations):
-                        if len(self.agent.replay_buffer) >= self.batch_size:
-                            self.agent.train(self.batch_size)
+                train_iterations = int(np.mean(list(episode_steps.values())))
+                print(f"  Training iterations: {train_iterations}")
+                self.agent.td_error_history = []
+
+                # Drop out engines with low rewards, reweight the sampling distribution
+                if self.engine_dropout and episode > 10:
+                    treshold = np.max(
+                        self.rewards_history[:self.total_envs * 10]) * self.drop_out_limit
+
+                    for cur in self.engines_dict.keys():
+                        if np.mean(self.stats.type_rewards[engine][:10]) < treshold:
+                            drop_out_dict = {
+                                engine_name: self.engines_dict[engine_name] / (1 - self.engines_dict[cur]) for engine_name in self.engines_dict.keys()}
+                            drop_out_dict[engine] = 0
+                            self.agent.replay_buffer.drop_out(
+                                drop_out_dict)
+
+                for _ in range(train_iterations):
+                    if len(self.agent.replay_buffer) >= self.batch_size:
+                        self.agent.train(self.batch_size)
 
                 # Calculate average reward across all engines (weighted by count)
                 total_weighted_reward = 0

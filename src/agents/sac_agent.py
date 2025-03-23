@@ -91,7 +91,7 @@ class Critic(nn.Module):
 
 class SACAgent:
     def __init__(self, state_dim, action_dim, replay_buffer, hidden_dim=256,
-                 lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2,
+                 lr=3e-4, gamma=0.99, tau=0.005,
                  target_entropy=None, grad_clip=1.0,
                  warmup_steps=5000, initial_noise_scale=0.1):
 
@@ -141,6 +141,21 @@ class SACAgent:
         self.alpha_loss_history = []
         self.entropy_history = []
         self.td_error_history = []
+
+    def get_config(self):
+        """Return the configuration of the SAC agent."""
+        return {
+
+            'hidden_dim': self.actor.net[0].out_features,
+            'learning_rate': self.actor_optimizer.param_groups[0]['lr'],
+            'gamma': self.gamma,
+            'tau': self.tau,
+            'target_entropy': self.target_entropy,
+            'grad_clip': self.grad_clip,
+            'warmup_steps': self.warmup_steps,
+            'initial_noise_scale': self.initial_noise_scale,
+            'device': str(self.device)
+        }
 
     def select_action(self, state, evaluate=False):
         """Select action with warm-up exploration and proper noise handling."""

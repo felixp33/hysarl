@@ -92,6 +92,9 @@ class CompositionReplayBuffer:
             # Create buffer with exact max length
             self.engine_buffers[engine_type] = deque(maxlen=engine_capacity)
 
+    def dropout(self, new_composition: Optional[Dict[str, float]]):
+        self.sampling_composition = new_composition
+
     def push(self, state, action, reward, next_state, done, env_id, current_episode):
         """
         Add experience with comprehensive debugging for engine type extraction.

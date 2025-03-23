@@ -431,8 +431,6 @@ class Dashboard:
         ax.legend()
         ax.grid(True)
 
-    # In dashboard.py, add this method:
-
     def plot_td_error(self):
         """Plot TD error over episodes with individual points and trend line"""
         ax = self.axes[1, 1]

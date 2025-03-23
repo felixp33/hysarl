@@ -22,11 +22,12 @@ if __name__ == "__main__":
     action_dim = env_specs[env_name]['action_dim']
 
     # Initialize the composition-controlled replay buffer
+    buffer_capacity = 500000
     composition_buffer = CompositionReplayBuffer(
-        capacity=1000000,
-        strategy='stratified',  # Use stratified sampling
-        sampling_composition={'mujoco': 1, 'brax': 0},
-        buffer_composition={'mujoco': 1, 'brax': 0},
+        capacity=buffer_capacity,
+        strategy='stratified',
+        sampling_composition={'mujoco': 0.3, 'brax': 0.7},
+        buffer_composition={'mujoco': 0.3, 'brax': 0.7},
         engine_counts=engines,
         recency_bias=3.0
     )
@@ -36,11 +37,10 @@ if __name__ == "__main__":
         state_dim=state_dim,
         action_dim=action_dim,
         replay_buffer=composition_buffer,
-        hidden_dim=256,
+        hidden_dim=512,
         lr=3e-4,
         gamma=0.99,
-        tau=0.005,
-        alpha=0.2,
+        tau=0.01,
         target_entropy=-0.5*action_dim,
         grad_clip=5.0,
         warmup_steps=20000
@@ -50,11 +50,12 @@ if __name__ == "__main__":
     pipeline = TrainingPipeline(
         env_name=env_name,
         engines_dict=engines,
-        buffer_capacity=1000000,
+        buffer_capacity=buffer_capacity,
         batch_size=256,
         episodes=500,
         steps_per_episode=1000,
         agent=sac_agent
+
     )
 
     # Run training
