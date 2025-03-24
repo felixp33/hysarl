@@ -146,14 +146,6 @@ class CompositionReplayBuffer:
         # Reset cached composition
         self._last_composition = None
 
-        # Optional: Periodic composition logging
-        if current_episode % 50 == 0:
-            current_comp = self.get_current_composition()
-
-            for eng, comp in current_comp.items():
-                print(
-                    f"{eng}: {comp * 100:.2f}% (buffer size: {len(self.engine_buffers[eng])})")
-
     def sample(self, batch_size: int) -> Tuple:
         """
         Wrapper method to call the appropriate sampling strategy

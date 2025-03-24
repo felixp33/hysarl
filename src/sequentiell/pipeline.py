@@ -7,11 +7,9 @@ from src.sequentiell.stats import TrainingStats
 
 
 class TrainingPipeline:
-    def __init__(self, env_name, engines_dict, buffer_capacity, batch_size, episodes, steps_per_episode, agent, engine_dropout=None, drop_out_limit=None):
+    def __init__(self, env_name, engines_dict, batch_size, episodes, steps_per_episode, agent, engine_dropout=False, drop_out_limit=None):
         self.env_name = env_name
-        self.engines_dict = engines_dict
-        self.total_envs = sum(engines_dict.values())
-        self.buffer_capacity = buffer_capacity
+        self.total_envs = sum(agent.replay_buffer.engines_dict.values())
         self.batch_size = batch_size
         self.episodes = episodes
         self.steps_per_episode = steps_per_episode
@@ -27,8 +25,7 @@ class TrainingPipeline:
         self.dashboard = Dashboard(
             self.total_envs,
             {'Environment': env_name,
-             'Engines': engines_dict,
-             'Buffer Capacity': buffer_capacity,
+             'Engines': agent.replay_buffer.engines_dict,
              'Batch Size': batch_size,
              'Episodes': episodes,
              'Steps per Episode': steps_per_episode,
@@ -79,17 +76,33 @@ class TrainingPipeline:
                 self.agent.td_error_history = []
 
                 # Drop out engines with low rewards, reweight the sampling distribution
-                if self.engine_dropout and episode > 10:
-                    treshold = np.max(
-                        self.rewards_history[:self.total_envs * 10]) * self.drop_out_limit
-
+                if self.engine_dropout and episode > 200 and len(self.engines_dict.keys()) > 1:
+                    averages = {cur: np.mean(self.stats.type_rewards[cur][-10:])
+                                for cur in self.engines_dict.keys()}
+                    treshold = np.max(list(averages.values())
+                                      ) * self.drop_out_limit
+                    print("averages ", averages, " treshold: ", treshold)
                     for cur in self.engines_dict.keys():
-                        if np.mean(self.stats.type_rewards[engine][:10]) < treshold:
+                        print("cur: ", cur,   1 -
+                              self.agent.replay_buffer.sampling_composition[cur])
+                        print("Mean reward 10 epsiodes: ", np.mean(
+                            self.stats.type_rewards[cur][-10:]))
+                        if averages[cur] < treshold:
+                            print(
+                                f"Engine {cur} has low rewards, dropping out...")
+                            for engine_name in self.engines_dict.keys():
+                                print(
+                                    "a: ", self.agent.replay_buffer.sampling_composition[engine_name], "b: ", (1-self.agent.replay_buffer.sampling_composition[cur]))
+
                             drop_out_dict = {
-                                engine_name: self.engines_dict[engine_name] / (1 - self.engines_dict[cur]) for engine_name in self.engines_dict.keys()}
-                            drop_out_dict[engine] = 0
-                            self.agent.replay_buffer.drop_out(
-                                drop_out_dict)
+                                engine_name: self.agent.replay_buffer.sampling_composition[engine_name] / (1-self.agent.replay_buffer.sampling_composition[cur]) for engine_name in self.engines_dict.keys()}
+                            drop_out_dict[cur] = 0
+                            self.engines_dict[cur] = 0
+
+                            print(self.engines_dict)
+                            print("dropout_dict: ", drop_out_dict)
+                            self.agent.replay_buffer.sampling_composition = drop_out_dict
+                            break
 
                 for _ in range(train_iterations):
                     if len(self.agent.replay_buffer) >= self.batch_size:
@@ -99,7 +112,7 @@ class TrainingPipeline:
                 total_weighted_reward = 0
                 total_weight = 0
                 for engine, reward in episode_rewards.items():
-                    count = self.engines_dict[engine]
+                    count = self.engines_dict.get(engine, 0)
                     total_weighted_reward += reward * count
                     total_weight += count
 

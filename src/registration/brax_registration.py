@@ -8,6 +8,8 @@ from brax import envs
 
 def register_brax_envs():
     """Register Brax environments with Gymnasium."""
+    # jax.config.update('jax_platform_name', 'gpu')
+
     try:
         # Check if environments are already registered
         env = gym.make('BraxHalfCheetah-v0')

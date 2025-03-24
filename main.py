@@ -22,20 +22,19 @@ if __name__ == "__main__":
     action_dim = env_specs[env_name]['action_dim']
 
     # Initialize the composition-controlled replay buffer
-    buffer_capacity = 500000
     composition_buffer = CompositionReplayBuffer(
-        capacity=buffer_capacity,
+        capacity=500000,
         strategy='stratified',
-        sampling_composition={'mujoco': 0.7, 'brax': 0.3},
-        buffer_composition={'mujoco': 0.7, 'brax': 0.3},
+        sampling_composition={'mujoco': 0.5, 'brax': 0.5},
+        buffer_composition={'mujoco': 0.5, 'brax': 0.5},
         engine_counts=engines,
         recency_bias=3.0
     )
 
     # Initialize SAC agent with optimal parameters for HalfCheetah
     sac_agent = SACAgent(
-        state_dim=state_dim,
-        action_dim=action_dim,
+        state_dim=env_specs[env_name]['state_dim'],
+        action_dim=env_specs[env_name]['action_dim'],
         replay_buffer=composition_buffer,
         hidden_dim=512,
         lr=3e-4,
@@ -50,12 +49,12 @@ if __name__ == "__main__":
     pipeline = TrainingPipeline(
         env_name=env_name,
         engines_dict=engines,
-        buffer_capacity=buffer_capacity,
         batch_size=256,
         episodes=500,
         steps_per_episode=1000,
-        agent=sac_agent
-
+        agent=sac_agent,
+        engine_dropout=True,
+        drop_out_limit=0.5
     )
 
     # Run training
