@@ -137,16 +137,13 @@ class EnvironmentOrchestrator:
 
             action = agent.select_action(state)
 
-            if stats is not None:
-                stats.start_instance_timing(engine_type)
+            stats.start_instance_timing(engine_type)
+
             next_state, reward, terminated, truncated, _ = env.step(action)
 
-            if stats is not None:
-                stats.end_instance_timing(engine_type)
+            stats.end_instance_timing(engine_type)
 
-            # Ensure next_state is a numpy array (important for Brax)
-            if not isinstance(next_state, np.ndarray):
-                next_state = np.array(next_state, dtype=np.float32)
+            next_state = np.array(next_state, dtype=np.float32)
 
             done = terminated or truncated
 
