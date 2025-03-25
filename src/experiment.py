@@ -21,7 +21,7 @@ def halfchetah_experiment(sampling_composition):
         )
 
         sac_agent = SACAgent(
-            state_dim=env_specs[env_name]['state_dim'],
+            state_dim=17,
             action_dim=action_dim,
             replay_buffer=composition_buffer,
             hidden_dim=512,
