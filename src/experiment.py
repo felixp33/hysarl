@@ -9,7 +9,7 @@ def halfchetah_experiment(sampling_composition):
     for _ in range(10):
         env_name = 'HalfCheetah',
 
-        action_dim = env_specs[env_name]['action_dim']
+        action_dim = 6
 
         composition_buffer = CompositionReplayBuffer(
             capacity=500000,
