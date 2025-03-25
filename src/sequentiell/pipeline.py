@@ -23,16 +23,17 @@ class TrainingPipeline:
         self.dashboard_active = dashboard_active
 
         # Setup dashboard
-        self.dashboard = Dashboard(
-            self.total_envs,
-            {'Environment': env_name,
-             'Engines': agent.replay_buffer.engine_counts,
-             'Batch Size': batch_size,
-             'Episodes': episodes,
-             'Steps per Episode': steps_per_episode,
-             'Agent': agent.get_config(),
-             }
-        )
+        if dashboard_active:
+            self.dashboard = Dashboard(
+                self.total_envs,
+                {'Environment': env_name,
+                 'Engines': agent.replay_buffer.engine_counts,
+                 'Batch Size': batch_size,
+                 'Episodes': episodes,
+                 'Steps per Episode': steps_per_episode,
+                 'Agent': agent.get_config(),
+                 }
+            )
 
     def run(self):
         try:
@@ -115,13 +116,15 @@ class TrainingPipeline:
                 self.stats.agent_diagnostic.append(agent_diagnostics)
 
                 # Update dashboard
-                self.dashboard.update(
-                    self.rewards_history,
-                    self.agent.replay_buffer,
-                    episode,
-                    episode_dones,
-                    self.stats
-                )
+
+                if self.dashboard_active:
+                    self.dashboard.update(
+                        self.rewards_history,
+                        self.agent.replay_buffer,
+                        episode,
+                        episode_dones,
+                        self.stats
+                    )
 
                 # Print periodic summary
                 if episode % 10 == 0 or episode == self.episodes - 1:
@@ -131,12 +134,11 @@ class TrainingPipeline:
                         steps = stats_data['episode_steps'][engine_type]
                         avg_duration = np.mean(
                             self.stats.episode_durations[engine_type][-10:]) if self.stats.episode_durations[engine_type] else 0
-                        print(f"{engine_type}:")
-                        print(f"  Mean Reward: {rewards[-1]:.3f}")
-                        print(f"  Mean Steps: {steps[-1]:.1f}")
-                        print(f"  Avg Duration: {avg_duration:.3f}s")
+                        print(
+                            f"{engine_type}:  Mean Reward: {rewards[-1]:.3f}  Mean Steps: {steps[-1]:.1f}  Avg Duration: {avg_duration:.3f}s")
 
             print("✅ Training complete!")
+            self.stats.export_to_hdf5(download_local=True, save_to_drive=True)
 
         except Exception as e:
             print(f"Error during training: {e}")

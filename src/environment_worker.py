@@ -30,7 +30,7 @@ env_specs = {
         'state_dim': 17,
         'action_dim': 6,
         'engines': {
-            'mujoco': 'HalfCheetah-v4',
+            'mujoco': 'HalfCheetah-v5',
             'brax': 'BraxHalfCheetah-v0',
         }
     },
