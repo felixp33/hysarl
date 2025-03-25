@@ -7,7 +7,7 @@ from src.environment_orchestrator import env_specs
 
 def halfchetah_experiment(sampling_composition):
     for _ in range(10):
-        env_name = 'HalfCheetah',
+        env_name = 'HalfCheetah'
 
         action_dim = 6
 
