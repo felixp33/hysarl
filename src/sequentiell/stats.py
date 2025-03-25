@@ -24,6 +24,8 @@ class TrainingStats:
 
         # Create index mapping for dashboard compatibility
         self.engine_indices = {}
+        self.agent_diagnostic = []
+
         env_id = 0
         for engine, count in engines_dict.items():
             self.engine_indices[engine] = []

@@ -39,7 +39,7 @@ if __name__ == "__main__":
         hidden_dim=512,
         lr=3e-4,
         gamma=0.99,
-        tau=0.01,
+        tau=0.005,
         target_entropy=-0.5*action_dim,
         grad_clip=5.0,
         warmup_steps=20000

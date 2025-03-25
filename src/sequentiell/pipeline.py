@@ -7,25 +7,26 @@ from src.sequentiell.stats import TrainingStats
 
 
 class TrainingPipeline:
-    def __init__(self, env_name, engines_dict, batch_size, episodes, steps_per_episode, agent, engine_dropout=False, drop_out_limit=None):
+    def __init__(self, env_name, engines_dict, batch_size, episodes, steps_per_episode, agent, engine_dropout=False, drop_out_limit=None, dashboard_active=True):
         self.env_name = env_name
-        self.total_envs = sum(agent.replay_buffer.engines_dict.values())
+        self.total_envs = sum(agent.replay_buffer.engine_counts.values())
         self.batch_size = batch_size
         self.episodes = episodes
         self.steps_per_episode = steps_per_episode
-
+        self.engines_dict = engines_dict
         self.envs = EnvironmentOrchestrator(env_name, engines_dict)
         self.rewards_history = []
         self.agent = agent
         self.stats = TrainingStats(engines_dict)
         self.engine_dropout = engine_dropout
         self.drop_out_limit = drop_out_limit
+        self.dashboard_active = dashboard_active
 
         # Setup dashboard
         self.dashboard = Dashboard(
             self.total_envs,
             {'Environment': env_name,
-             'Engines': agent.replay_buffer.engines_dict,
+             'Engines': agent.replay_buffer.engine_counts,
              'Batch Size': batch_size,
              'Episodes': episodes,
              'Steps per Episode': steps_per_episode,
@@ -35,12 +36,10 @@ class TrainingPipeline:
 
     def run(self):
         try:
-            print(
-                f"Starting sequential training with {len(self.engines_dict)} engine types")
+
             plt.ion()  # Interactive plotting mode
 
             for episode in range(self.episodes):
-                print(f"\nEpisode {episode + 1}/{self.episodes}")
 
                 episode_rewards = {}
                 episode_steps = {}
@@ -67,12 +66,8 @@ class TrainingPipeline:
                         idx = self.stats.engine_indices[engine_type][i]
                         episode_dones[idx] = done
 
-                    print(
-                        f"  {engine_type}: Reward = {reward:.2f}, Steps = {steps}")
-
                     # Train the agent multiple times after each environment episode
                 train_iterations = int(np.mean(list(episode_steps.values())))
-                print(f"  Training iterations: {train_iterations}")
                 self.agent.td_error_history = []
 
                 # Drop out engines with low rewards, reweight the sampling distribution
@@ -81,26 +76,13 @@ class TrainingPipeline:
                                 for cur in self.engines_dict.keys()}
                     treshold = np.max(list(averages.values())
                                       ) * self.drop_out_limit
-                    print("averages ", averages, " treshold: ", treshold)
                     for cur in self.engines_dict.keys():
-                        print("cur: ", cur,   1 -
-                              self.agent.replay_buffer.sampling_composition[cur])
-                        print("Mean reward 10 epsiodes: ", np.mean(
-                            self.stats.type_rewards[cur][-10:]))
                         if averages[cur] < treshold:
-                            print(
-                                f"Engine {cur} has low rewards, dropping out...")
-                            for engine_name in self.engines_dict.keys():
-                                print(
-                                    "a: ", self.agent.replay_buffer.sampling_composition[engine_name], "b: ", (1-self.agent.replay_buffer.sampling_composition[cur]))
-
                             drop_out_dict = {
                                 engine_name: self.agent.replay_buffer.sampling_composition[engine_name] / (1-self.agent.replay_buffer.sampling_composition[cur]) for engine_name in self.engines_dict.keys()}
                             drop_out_dict[cur] = 0
                             self.engines_dict[cur] = 0
 
-                            print(self.engines_dict)
-                            print("dropout_dict: ", drop_out_dict)
                             self.agent.replay_buffer.sampling_composition = drop_out_dict
                             break
 
@@ -130,6 +112,7 @@ class TrainingPipeline:
                 # Update stats with agent diagnostics
                 stats_data = self.stats.get_stats()
                 stats_data['agent_diagnostics'] = agent_diagnostics
+                self.stats.agent_diagnostic.append(agent_diagnostics)
 
                 # Update dashboard
                 self.dashboard.update(
