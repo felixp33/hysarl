@@ -8,7 +8,7 @@ from brax import envs
 
 def register_brax_envs():
     """Register Brax environments with Gymnasium."""
-    jax.config.update('jax_platform_name', 'gpu')
+    jax.config.update('jax_platform_name', 'cpu')
 
     try:
         # Check if environments are already registered
@@ -136,11 +136,6 @@ def register_brax_envs():
             """Close the environment."""
             # Nothing special needed for Brax environments
             pass
-
-    # Initialize JAX to avoid first-call slowness
-    print("Initializing JAX...")
-    key = jax.random.PRNGKey(0)
-    _ = jax.random.normal(key, (1,))
 
     # Pre-compile common JAX operations
     print("Pre-compiling JAX operations...")
