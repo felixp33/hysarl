@@ -10,13 +10,14 @@ def halfchetah_experiment(sampling_composition):
         env_name = 'HalfCheetah'
 
         action_dim = 6
+        engines = {'mujoco': 1, 'brax': 1}
 
         composition_buffer = CompositionReplayBuffer(
             capacity=500000,
             strategy='stratified',
             sampling_composition=sampling_composition,
             buffer_composition={'mujoco': 0.5, 'brax': 0.5},
-            engine_counts={'mujoco': 1, 'brax': 1},
+            engine_counts=engines,
             recency_bias=3.0
         )
 
@@ -40,7 +41,8 @@ def halfchetah_experiment(sampling_composition):
             steps_per_episode=1000,
             agent=sac_agent,
             engine_dropout=False,
-            dashboard_active=False
+            dashboard_active=False,
+            engines_dict=engines
         )
 
         pipeline.run()
