@@ -5,8 +5,8 @@ from src.compostion_buffer import CompositionReplayBuffer
 from src.environment_orchestrator import env_specs
 
 
-def halfchetah_experiment(sampling_composition):
-    for _ in range(10):
+def halfchetah_experiment(sampling_composition, n=5):
+    for _ in range(n):
         env_name = 'HalfCheetah'
 
         action_dim = 6
@@ -28,7 +28,7 @@ def halfchetah_experiment(sampling_composition):
             hidden_dim=512,
             lr=3e-4,
             gamma=0.99,
-            tau=0.01,
+            tau=0.005,
             target_entropy=-0.5*action_dim,
             grad_clip=5.0,
             warmup_steps=20000

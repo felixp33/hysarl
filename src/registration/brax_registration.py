@@ -8,10 +8,15 @@ from brax import envs
 
 def register_brax_envs():
     """Register Brax environments with Gymnasium."""
-    jax.config.update('jax_platform_name', 'cpu')
 
     try:
-        # Check if environments are already registered
+        jax.devices('gpu')
+        print("GPU found, using GPU")
+    except RuntimeError:
+        jax.config.update('jax_platform_name', 'cpu')
+        print("No GPU found, using CPU")
+
+    try:
         env = gym.make('BraxHalfCheetah-v0')
         env.close()
         print("✅ Brax environments already registered.")

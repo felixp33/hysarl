@@ -148,4 +148,5 @@ class TrainingPipeline:
         finally:
             self.stats.export_to_csv()
             self.envs.close()
-            self.dashboard.close()
+            if self.dashboard_active:
+                self.dashboard.close()

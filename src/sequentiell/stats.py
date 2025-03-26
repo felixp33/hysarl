@@ -181,16 +181,11 @@ class TrainingStats:
             Path to the saved file
         """
 
-        # Check if running in Colab
-        in_colab = 'google.colab' in str(get_ipython())
-
         # Create local directory in Colab VM
         os.makedirs(output_dir, exist_ok=True)
 
         # Extract environment name
-        env_name = self.env_name if hasattr(
-            self, 'env_name') else "unknown_env"
-
+        env_name = "".join(str(key) for key in self.engines_dict.keys())
         # Extract sampling composition
         sampling_info = ""
         if hasattr(self, 'agent') and hasattr(self.agent, 'replay_buffer') and hasattr(self.agent.replay_buffer, 'sampling_composition'):
@@ -291,36 +286,5 @@ class TrainingStats:
             metadata_group.create_dataset('num_episodes', data=num_episodes)
 
         print(f"✅ Statistics saved to {filepath}")
-
-        # If in Colab and download requested, download to local machine
-        if in_colab and download_local:
-            try:
-                files.download(filepath)
-                print(f"✅ File downloaded to your local machine: {filename}")
-            except Exception as e:
-                print(f"⚠️ Error downloading file: {e}")
-
-        # If in Colab and Google Drive backup requested
-        if in_colab and save_to_drive:
-            try:
-                from google.colab import drive
-
-                # Check if drive is mounted, if not, mount it
-                mounted = os.path.exists('/content/drive')
-                if not mounted:
-                    drive.mount('/content/drive')
-
-                # Create directory in Drive
-                drive_dir = f"/content/drive/MyDrive/RL_Experiments/{env_name}/{sampling_info}"
-                os.makedirs(drive_dir, exist_ok=True)
-
-                # Copy file to Drive
-                drive_path = f"{drive_dir}/{filename}"
-                import shutil
-                shutil.copyfile(filepath, drive_path)
-
-                print(f"✅ Backup saved to Google Drive: {drive_path}")
-            except Exception as e:
-                print(f"⚠️ Error saving to Google Drive: {e}")
 
         return filepath
