@@ -231,10 +231,8 @@ class SACAgent:
         td_errors_2 = torch.abs(
             target_q - current_q2).detach().cpu().numpy().flatten()
 
-        self.td_error_history.append(td_errors.mean())
-        print(f"TD Error: ", td_errors.mean())
-        print(f"TD Error 2: ", td_errors_2.mean())
-        print(f"TD Error 3: ", 0.5*td_errors.mean()+0.5*td_errors_2.mean())
+        self.td_error_history.append(
+            0.5*td_errors.mean()+0.5*td_errors_2.mean())
 
         critic1_loss = F.huber_loss(current_q1, target_q)
         critic2_loss = F.huber_loss(current_q2, target_q)

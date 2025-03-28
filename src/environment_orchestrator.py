@@ -47,7 +47,7 @@ env_specs = {
             'brax': 'BraxHumanoid-v0',
         }
     },
-    'Walker2D': {
+    'Walker2d': {
         'state_dim': 17,
         'action_dim': 6,
         'engines': {

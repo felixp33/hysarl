@@ -1,4 +1,4 @@
-from src.experiment import halfchetah_experiment
+from src.experiment import halfchetah_experiment, walker_experiment
 from src.registration import register_all_envs
 from src.compostion_buffer import CompositionReplayBuffer
 from src.agents.sac_agent import SACAgent
@@ -13,4 +13,4 @@ import time
 register_all_envs()
 
 if __name__ == "__main__":
-    halfchetah_experiment({'mujoco': 1, 'brax': 0}, n=1)
+    walker_experiment({'mujoco': 0.5, 'brax': 0.5}, n_runs=1)
