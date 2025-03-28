@@ -21,7 +21,6 @@ class Actor(nn.Module):
         self.log_std_max = log_std_max
         self.action_dim = action_dim
 
-        # Use LayerNorm for better training stability
         self.net = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
@@ -34,7 +33,6 @@ class Actor(nn.Module):
         self.mean = nn.Linear(hidden_dim, action_dim)
         self.log_std = nn.Linear(hidden_dim, action_dim)
 
-        # Initialize with smaller weights
         self.apply(lambda m: initialize_weights(m, gain=1.0))
         initialize_weights(self.mean, gain=0.1)
         initialize_weights(self.log_std, gain=0.1)
@@ -52,14 +50,11 @@ class Actor(nn.Module):
         mean, log_std = self.forward(state)
         std = torch.exp(log_std)
 
-        # Sample with numerical stability
         normal = Normal(mean, std + 1e-6)
         x = normal.rsample()
 
-        # Squash sample
         action = torch.tanh(x)
 
-        # Compute log probability with improved stability
         log_prob = normal.log_prob(x)
         log_prob -= torch.log(torch.clamp(1 - action.pow(2), min=1e-6))
         log_prob = log_prob.sum(1, keepdim=True)
@@ -237,6 +232,9 @@ class SACAgent:
             target_q - current_q2).detach().cpu().numpy().flatten()
 
         self.td_error_history.append(td_errors.mean())
+        print(f"TD Error: ", td_errors.mean())
+        print(f"TD Error 2: ", td_errors_2.mean())
+        print(f"TD Error 3: ", 0.5*td_errors.mean()+0.5*td_errors_2.mean())
 
         critic1_loss = F.huber_loss(current_q1, target_q)
         critic2_loss = F.huber_loss(current_q2, target_q)
@@ -275,14 +273,11 @@ class SACAgent:
         alpha_loss.backward()
         self.alpha_optimizer.step()
 
-        # ✅ Ensure total_steps increments correctly
         self.total_steps += 1
 
-        # Update target networks
         self.safe_update_target(self.critic1_target, self.critic1)
         self.safe_update_target(self.critic2_target, self.critic2)
 
-        # Store training metrics
         self.critic_loss_history.append(
             (critic1_loss.item() + critic2_loss.item()) / 2)
         self.actor_loss_history.append(actor_loss.item())

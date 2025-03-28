@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from src.dashboard import Dashboard
 
 from src.environment_orchestrator import EnvironmentOrchestrator
-from src.sequentiell.stats import TrainingStats
+from src.sequentiell.metrics_collector import MetricsCollector
 
 
 class TrainingPipeline:
@@ -17,7 +17,7 @@ class TrainingPipeline:
         self.envs = EnvironmentOrchestrator(env_name, engines_dict)
         self.rewards_history = []
         self.agent = agent
-        self.stats = TrainingStats(engines_dict)
+        self.stats = MetricsCollector(engines_dict)
         self.engine_dropout = engine_dropout
         self.drop_out_limit = drop_out_limit
         self.dashboard_active = dashboard_active
@@ -37,8 +37,8 @@ class TrainingPipeline:
 
     def run(self):
         try:
-
-            plt.ion()  # Interactive plotting mode
+            if self.dashboard_active:
+                plt.ion()
 
             for episode in range(self.episodes):
 
@@ -58,7 +58,6 @@ class TrainingPipeline:
                         stats=self.stats
                     )
 
-                    # Store results
                     episode_rewards[engine_type] = reward
                     episode_steps[engine_type] = steps
 

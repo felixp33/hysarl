@@ -13,4 +13,4 @@ import time
 register_all_envs()
 
 if __name__ == "__main__":
-    halfchetah_experiment({'mujoco': 0.7, 'brax': 0.3}, n=1)
+    halfchetah_experiment({'mujoco': 1, 'brax': 0}, n=1)

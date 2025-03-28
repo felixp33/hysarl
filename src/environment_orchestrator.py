@@ -5,8 +5,6 @@ import numpy as np
 import time
 
 
-register_all_envs()
-
 # Environment specifications for MuJoCo, Brax, and PyBullet
 env_specs = {
     'CartPole': {
@@ -93,6 +91,8 @@ class EnvironmentOrchestrator:
         self.active_envs = []
 
         # Create one environment for each engine type
+        register_all_envs()
+
         for engine_type in engines_dict.keys():
             env_id = env_specs[env_name]['engines'][engine_type]
             try:
@@ -132,7 +132,7 @@ class EnvironmentOrchestrator:
         if not isinstance(state, np.ndarray):
             state = np.array(state, dtype=np.float32)
 
-        for step in range(steps_per_episode):
+        for _ in range(steps_per_episode):
             # Record timing if stats object is provided
 
             action = agent.select_action(state)

@@ -5,12 +5,9 @@ import os
 import csv
 import time
 import h5py
-import h5py
-import os
-import numpy as np
 
 
-class TrainingStats:
+class MetricsCollector:
     def __init__(self, engines_dict):
         self.engines_dict = engines_dict
         self.unique_engines = list(engines_dict.keys())

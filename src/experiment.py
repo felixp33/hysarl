@@ -1,4 +1,5 @@
 
+from src.agents.agent_config import sac_agent_walker
 from src.agents.sac_agent import SACAgent
 from src.sequentiell.pipeline import TrainingPipeline
 from src.compostion_buffer import CompositionReplayBuffer
@@ -16,7 +17,7 @@ def halfchetah_experiment(sampling_composition, n=5):
             capacity=500000,
             strategy='stratified',
             sampling_composition=sampling_composition,
-            buffer_composition={'mujoco': 0.5, 'brax': 0.5},
+            buffer_composition={'mujoco': 1.0, 'brax': 1.0},
             engine_counts=engines,
             recency_bias=3.0
         )
@@ -39,9 +40,9 @@ def halfchetah_experiment(sampling_composition, n=5):
             batch_size=256,
             episodes=500,
             steps_per_episode=1000,
-            agent=sac_agent,
+            agent=sac_agent_walker(composition_buffer),
             engine_dropout=False,
-            dashboard_active=False,
+            dashboard_active=True,
             engines_dict=engines
         )
 

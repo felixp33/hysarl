@@ -84,7 +84,6 @@ class ReplayBuffer:
         """
         samples = []
 
-        # Group experiences by engine type (extracted from env_id)
         grouped = {}
         for exp in self.buffer:
             engine_type = exp[-1].split('_')[0]
