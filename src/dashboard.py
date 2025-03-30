@@ -18,7 +18,6 @@ class Dashboard:
         self.buffer_composition_history = {engine: []
                                            for engine in self.engines_dict.keys()}
 
-        # Existing tracking for engine-level metrics
         self.episode_times_history = {engine: []
                                       for engine in self.engines_dict.keys()}
         self.sample_ages_history = {engine: []
@@ -156,10 +155,6 @@ class Dashboard:
         # Collect samples for each engine type
         for env_id, samples in self.samples_history.items():
             engine_type = env_id.split('_')[0]
-
-            if engine_type not in engine_samples:
-                print(f"⚠️ Unexpected engine type: {engine_type}")
-                continue
 
             # If samples list exists, use it
             if samples:

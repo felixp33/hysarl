@@ -182,10 +182,6 @@ class CompositionReplayBuffer:
             # Calculate target number of samples for this engine type
 
             n_samples = max(0, int(proportion * batch_size))
-            # Ensure the engine type exists in buffers
-            if engine_type not in self.engine_buffers:
-
-                continue
 
             buffer = self.engine_buffers[engine_type]
 
