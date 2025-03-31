@@ -2,10 +2,7 @@ from registration.brax_registration import register_brax_envs
 import gymnasium as gym
 from multiprocessing import Process, Pipe
 import numpy as np
-import time
 import traceback
-import os
-import signal
 from src.environment_orchestrator import get_env_specs
 # Import Brax registration
 register_brax_envs()  # Register Brax environments with Gymnasium

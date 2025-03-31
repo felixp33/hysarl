@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from src.agents.base_agent import BaseAgent
 from src.dashboard import Dashboard
 
 from src.environment_orchestrator import EnvironmentOrchestrator
@@ -7,7 +8,7 @@ from src.sequentiell.metrics_collector import MetricsCollector
 
 
 class TrainingPipeline:
-    def __init__(self, env_name, engines_dict, batch_size, episodes, steps_per_episode, agent, engine_dropout=False, drop_out_limit=None, dashboard_active=True):
+    def __init__(self, env_name: str, engines_dict, batch_size, episodes, steps_per_episode, agent: BaseAgent, engine_dropout=False, drop_out_limit=None, dashboard_active=True):
         self.env_name = env_name
         self.total_envs = sum(agent.replay_buffer.engine_counts.values())
         self.batch_size = batch_size

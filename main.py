@@ -6,4 +6,4 @@ import numpy as np
 register_all_envs()
 
 if __name__ == "__main__":
-    ant_experiment_sac({'mujoco': 1, 'brax': 0}, n_runs=1)
+    halfcheetah_experiment_td3({'mujoco': 0.25, 'brax': 0.75}, n_runs=1)

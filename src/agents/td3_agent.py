@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from src.agents.base_agent import BaseAgent
+
 
 def initialize_weights(module, gain=1):
     """Custom weight initialization"""
@@ -59,7 +61,7 @@ class Critic(nn.Module):
         return self.net(x)
 
 
-class TD3Agent:
+class TD3Agent(BaseAgent):
     def __init__(self, state_dim, action_dim, replay_buffer, hidden_dim=256,
                  lr=3e-4, gamma=0.99, tau=0.005, grad_clip=1.0,
                  warmup_steps=5000, initial_noise_scale=0.1,

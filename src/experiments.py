@@ -1,9 +1,7 @@
-
 from src.agents.sac_agent import SACAgent
 from src.agents.td3_agent import TD3Agent
 from src.sequentiell.pipeline import TrainingPipeline
 from src.compostion_buffer import CompositionReplayBuffer
-from src.environment_orchestrator import env_specs
 
 
 def halfchetah_experiment_sac(sampling_composition, n_runs=1):

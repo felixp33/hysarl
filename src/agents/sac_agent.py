@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Normal
 
+from src.agents.base_agent import BaseAgent
+
 
 def initialize_weights(module, gain=1):
     """Custom weight initialization"""
@@ -84,7 +86,7 @@ class Critic(nn.Module):
         return self.net(x)
 
 
-class SACAgent:
+class SACAgent(BaseAgent):
     def __init__(self, state_dim, action_dim, replay_buffer, hidden_dim=256,
                  lr=3e-4, gamma=0.99, tau=0.005,
                  target_entropy=None, grad_clip=1.0,
