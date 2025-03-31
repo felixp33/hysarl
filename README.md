@@ -91,3 +91,57 @@ HySARL consists of several key components:
 📊 Experiments
 The repository contains several pre-configured experiments
 
+
+
+## 💻 Advanced Usage
+
+For more advanced configurations, you can customize your training setup:
+
+```python
+from src.compostion_buffer import CompositionReplayBuffer
+from src.agents.sac_agent import SACAgent
+from src.sequentiell.pipeline import TrainingPipeline
+
+# Define engines to use
+engines = {'mujoco': 1, 'brax': 1}
+
+# Create a composition buffer with custom parameters
+composition_buffer = CompositionReplayBuffer(
+    capacity=500000,
+    strategy='stratified',
+    sampling_composition={'mujoco': 0.5, 'brax': 0.5},  # Equal sampling from both engines
+    buffer_composition={'mujoco': 1.0, 'brax': 1.0},    # Equal buffer space allocation
+    engine_counts=engines,
+    recency_bias=3.0                                    # Bias toward recent experiences
+)
+
+# Initialize SAC agent with custom hyperparameters
+sac_agent = SACAgent(
+    state_dim=17,                 # State dimension for HalfCheetah
+    action_dim=6,                 # Action dimension for HalfCheetah
+    replay_buffer=composition_buffer,
+    hidden_dim=512,               # Size of hidden layers
+    lr=3e-4,                      # Learning rate
+    gamma=0.99,                   # Discount factor
+    tau=0.005,                    # Target network update rate
+    target_entropy=-0.5*6,        # Target entropy for automatic temperature tuning
+    grad_clip=5.0,                # Gradient clipping threshold
+    warmup_steps=20000            # Random exploration steps
+)
+
+# Set up the training pipeline
+pipeline = TrainingPipeline(
+    env_name='HalfCheetah',
+    batch_size=100,
+    episodes=500,
+    steps_per_episode=1000,
+    agent=sac_agent,
+    engine_dropout=False,         # Disable engine dropout during training
+    dashboard_active=True,        # Enable real-time dashboard
+    engines_dict=engines
+)
+
+# Start training
+pipeline.run()
+
+```
