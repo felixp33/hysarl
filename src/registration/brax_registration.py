@@ -95,37 +95,29 @@ def register_brax_envs():
                     self.key = jax.random.PRNGKey(seed)
 
                 self.key, subkey = jax.random.split(self.key)
-                start_time = time.time()
                 self.state = self._reset_jit(subkey)  # Use JIT-compiled reset
-                reset_time = time.time() - start_time
 
-                # Convert to numpy array and ensure float32
                 obs = np.array(self.state.obs, dtype=np.float32)
                 return obs, {}
             except Exception as e:
-                print(f"❌ Error in Brax reset: {e}")
+                print(f"Error in Brax reset: {e}")
                 # Return zeros as fallback
                 return np.zeros(self.observation_space.shape, dtype=np.float32), {}
 
         def step(self, action):
             """Take a step in the environment using JIT-compiled functions."""
             try:
-                # Convert action to the right format if needed
                 action = np.array(action, dtype=np.float32)
 
-                # Use JIT-compiled step function for performance
-                start_time = time.time()
                 self.state = self._step_jit(self.state, action)
-                step_time = time.time() - start_time
 
-                # Extract information and explicitly convert to numpy
                 obs = np.array(self.state.obs, dtype=np.float32)
                 reward = float(self.state.reward)
                 done = bool(self.state.done)
 
                 return obs, reward, done, False, {}
             except Exception as e:
-                print(f"❌ Error in Brax step: {e}")
+                print(f"Error in Brax step: {e}")
                 import traceback
                 traceback.print_exc()
                 # Return zeros as fallback
@@ -142,28 +134,20 @@ def register_brax_envs():
             # Nothing special needed for Brax environments
             pass
 
-    # Pre-compile common JAX operations
-    print("Pre-compiling JAX operations...")
     dummy_env = envs.get_environment('halfcheetah')
     dummy_key = jax.random.PRNGKey(0)
     dummy_state = dummy_env.reset(dummy_key)
     dummy_action = np.zeros((dummy_env.action_size,), dtype=np.float32)
 
-    # JIT-compile step and measure time
-    print("Compiling step function...")
     jit_step = jax.jit(dummy_env.step)
     start = time.time()
     _ = jit_step(dummy_state, dummy_action)
     first_compile = time.time() - start
-    print(f"First step compilation took {first_compile:.3f}s")
 
-    # Test compiled step speed
     start = time.time()
     _ = jit_step(dummy_state, dummy_action)
     second_step = time.time() - start
-    print(f"Second step took {second_step:.3f}s (should be much faster)")
 
-    # Map of Brax environment names to their Gymnasium registration IDs
     brax_env_mapping = {
         'halfcheetah': 'BraxHalfCheetah-v0',
         'ant': 'BraxAnt-v0',
@@ -171,12 +155,8 @@ def register_brax_envs():
         'walker2d': 'BraxWalker2d-v0',
         'hopper': 'BraxHopper-v0',
         'reacher': 'BraxReacher-v0',
-        'cartpole': 'BraxCartPole-v0',
-        'pendulum': 'BraxPendulum-v0',
-        # Add any other Brax environments here
     }
 
-    # Register all environments
     for brax_name, gym_id in brax_env_mapping.items():
         try:
             print(f"Registering {gym_id}...")

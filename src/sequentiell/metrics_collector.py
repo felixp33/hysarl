@@ -12,18 +12,12 @@ class MetricsCollector:
         self.engines_dict = engines_dict
         self.unique_engines = list(engines_dict.keys())
 
-        # Track rewards per engine type
         self.type_rewards = {engine: [] for engine in self.unique_engines}
-
-        # Track timing per engine type
         self.start_times = {engine: None for engine in self.unique_engines}
         self.step_times = {engine: [] for engine in self.unique_engines}
         self.episode_durations = {engine: [] for engine in self.unique_engines}
-
-        # Track steps per engine type
         self.episode_steps = {engine: [] for engine in self.unique_engines}
 
-        # Create index mapping for dashboard compatibility
         self.engine_indices = {}
         self.agent_diagnostic = []
 
@@ -34,7 +28,6 @@ class MetricsCollector:
                 self.engine_indices[engine].append(env_id)
                 env_id += 1
 
-        # Track rewards per instance (for dashboard compatibility)
         self.instance_rewards = {i: []
                                  for i in range(sum(engines_dict.values()))}
         self.td_errors = []

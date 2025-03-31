@@ -187,7 +187,7 @@ class ReplayBuffer:
         """Clear all experiences from the buffer."""
         self.buffer = []
         self.position = 0
-        self.sampled_counts = {}  # Reset sampled counts as well
+        self.sampled_counts = {}
 
     def __len__(self) -> int:
         """Return the current size of the buffer."""

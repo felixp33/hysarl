@@ -94,7 +94,7 @@ def ant_experiment_sac(sampling_composition, n_runs=1):
         engines = {'mujoco': 1, 'brax': 1}
 
         composition_buffer = CompositionReplayBuffer(
-            capacity=500000,
+            capacity=1000000,
             strategy='stratified',
             sampling_composition=sampling_composition,
             buffer_composition={'mujoco': 1.0, 'brax': 1.0},
@@ -103,20 +103,20 @@ def ant_experiment_sac(sampling_composition, n_runs=1):
         )
 
         sac_agent = SACAgent(
-            state_dim=11,
-            action_dim=2,
+            state_dim=27,
+            action_dim=8,
             replay_buffer=composition_buffer,
             hidden_dim=512,
             lr=3e-4,
             gamma=0.99,
             tau=0.005,
-            target_entropy=-0.5*2,
+            target_entropy=-0.5*8,
             grad_clip=5.0,
             warmup_steps=20000
         )
 
         pipeline = TrainingPipeline(
-            env_name='Reacher',
+            env_name='Ant',
             batch_size=256,
             episodes=500,
             steps_per_episode=1000,
@@ -140,7 +140,7 @@ def halfcheetah_experiment_td3(sampling_composition, n_runs=1):
             sampling_composition=sampling_composition,
             buffer_composition={'mujoco': 0.5, 'brax': 0.5},
             engine_counts=engines,
-            recency_bias=3.0
+            recency_bias=1.0
         )
 
         sac_agent_walker = TD3Agent(state_dim=17,
@@ -179,7 +179,7 @@ def walker_experiment_td3(sampling_composition, n_runs=1):
             sampling_composition=sampling_composition,
             buffer_composition={'mujoco': 0.5, 'brax': 0.5},
             engine_counts=engines,
-            recency_bias=3.0
+            recency_bias=1.0
         )
 
         sac_agent_walker = TD3Agent(state_dim=17,

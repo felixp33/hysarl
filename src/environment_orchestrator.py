@@ -2,7 +2,6 @@ from src.registration import register_all_envs
 
 import gymnasium as gym
 import numpy as np
-import time
 
 
 # Environment specifications for MuJoCo, Brax, and PyBullet
@@ -66,6 +65,10 @@ env_specs = {
         }
     }
 }
+
+
+def getEnvSpecs(env_name):
+    return env_specs[env_name]
 
 
 class EnvironmentOrchestrator:

@@ -1,3 +1,4 @@
+from registration.brax_registration import register_brax_envs
 import gymnasium as gym
 from multiprocessing import Process, Pipe
 import numpy as np
@@ -5,76 +6,9 @@ import time
 import traceback
 import os
 import signal
-
+from src.environment_orchestrator import get_env_specs
 # Import Brax registration
-from registration.brax_registration import register_brax_envs
 register_brax_envs()  # Register Brax environments with Gymnasium
-env_specs = {
-    'CartPole': {
-        'state_dim': 4,
-        'action_dim': 2,  # Discrete action space for CartPole
-        'engines': {
-            'gym': 'CartPole-v1',  # Using gym since it's not MuJoCo
-            'brax': 'BraxCartPole-v0'
-        }
-    },
-    'Pendulum': {
-        'state_dim': 3,
-        'action_dim': 1,
-        'engines': {
-            'gym': 'Pendulum-v1',  # Using gym since it's not MuJoCo
-            'brax': 'BraxPendulum-v0'
-        }
-    },
-    'HalfCheetah': {
-        'state_dim': 17,
-        'action_dim': 6,
-        'engines': {
-            'mujoco': 'HalfCheetah-v5',
-            'brax': 'BraxHalfCheetah-v0',
-        }
-    },
-    'Ant': {
-        'state_dim': 27,
-        'action_dim': 8,
-        'engines': {
-            'mujoco': 'Ant-v4',
-            'brax': 'BraxAnt-v0',
-        }
-    },
-    'Humanoid': {
-        'state_dim': 376,
-        'action_dim': 17,
-        'engines': {
-            'mujoco': 'Humanoid-v4',
-            'brax': 'BraxHumanoid-v0',
-        }
-    },
-    'Walker2D': {
-        'state_dim': 17,
-        'action_dim': 6,
-        'engines': {
-            'mujoco': 'Walker2d-v4',
-            'brax': 'BraxWalker2d-v0',
-        }
-    },
-    'Reacher': {
-        'state_dim': 11,
-        'action_dim': 2,
-        'engines': {
-            'mujoco': 'Reacher-v4',
-            'brax': 'BraxReacher-v0',
-        }
-    },
-    'Hopper': {
-        'state_dim': 11,
-        'action_dim': 3,
-        'engines': {
-            'mujoco': 'Hopper-v4',
-            'brax': 'BraxHopper-v0',
-        }
-    }
-}
 
 
 class EnvironmentWorker(Process):
@@ -84,14 +18,14 @@ class EnvironmentWorker(Process):
         self.engine = engine
         self.conn = conn
         self.env_id = env_id
-        self.daemon = True  # Make workers daemonic so they exit when main process exits
+        self.daemon = True
 
     def run(self):
         print(f"🚀 Worker {self.env_id} ({self.engine}) starting...")
 
         try:
-            # Create environment
-            env = gym.make(env_specs[self.env_name]['engines'][self.engine])
+            env = gym.make(
+                get_env_specs(self.env_name)['engines'][self.engine])
             print(f"✅ Worker {self.env_id} ({self.engine}) initialized.")
 
             state, _ = env.reset()
@@ -104,19 +38,11 @@ class EnvironmentWorker(Process):
                 f"🔍 Worker {self.env_id} ({self.engine}) initial state shape: {state.shape}")
 
             while True:
-                # Very long timeout to ensure operations complete
-                if not self.conn.poll(timeout=60.0):
-                    print(
-                        f"⏳ Worker {self.env_id} ({self.engine}) waiting for command...")
-                    continue
 
                 cmd, data = self.conn.recv()
-                print(
-                    f"📝 Worker {self.env_id} ({self.engine}) received command: {cmd}")
 
                 if cmd == 'step':
-                    print(
-                        f"🔄 Worker {self.env_id} ({self.engine}) stepping with action shape: {np.array(data).shape}")
+
                     next_state, reward, terminated, truncated, _ = env.step(
                         data)
 
@@ -127,21 +53,16 @@ class EnvironmentWorker(Process):
                     done = terminated or truncated
                     env_identifier = f"{self.engine}_{self.env_id}"
 
-                    print(
-                        f"✓ Worker {self.env_id} ({self.engine}) step complete: reward={reward:.2f}, done={done}")
                     self.conn.send((next_state, reward, done, env_identifier))
 
                 elif cmd == 'reset':
-                    print(
-                        f"🔄 Worker {self.env_id} ({self.engine}) resetting...")
+
                     state, _ = env.reset()
 
                     # Ensure state is a numpy array (important for Brax)
                     if not isinstance(state, np.ndarray):
                         state = np.array(state, dtype=np.float32)
 
-                    print(
-                        f"✓ Worker {self.env_id} ({self.engine}) reset complete, state shape: {state.shape}")
                     self.conn.send(state)
 
                 elif cmd == 'close':
