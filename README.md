@@ -49,10 +49,11 @@ cd hysarl
 # Create and activate conda environment
 conda env create -f environment.yml
 conda activate hysarl
-
+```
 
 🏃‍♂️ Getting Started
 Training a basic agent
+```
 pythonCopyfrom src.experiments import halfchetah_experiment_sac
 from src.registration import register_all_envs
 
@@ -61,3 +62,32 @@ register_all_envs()
 
 # Run experiment with 50-50 composition between MuJoCo and Brax
 halfchetah_experiment_sac({'mujoco': 0.5, 'brax': 0.5})
+```
+
+Visualizing results
+```
+import matplotlib.pyplot as plt
+from src.viz import read_training_stats_h5, plot_training_stats
+
+# Read training statistics from an H5 file
+stats_data = read_training_stats_h5("logs/halfcheetah_20250325_204445.h5")
+
+# Plot the statistics
+fig = plot_training_stats(stats_data)
+plt.show()
+
+```
+
+## 🏛️ Architecture
+
+HySARL consists of several key components:
+
+1. **Environment Orchestrator**: Manages multiple simulation engines and provides a unified interface
+2. **Composition Buffer**: Sophisticated replay buffer that supports stratified sampling from different sources
+3. **Agents**: Implementation of SAC and TD3 algorithms
+4. **Training Pipeline**: Coordinates training across multiple environments
+5. **Metrics Collector**: Gathers and analyzes performance metrics
+
+📊 Experiments
+The repository contains several pre-configured experiments
+
