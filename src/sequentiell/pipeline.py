@@ -10,18 +10,18 @@ from src.sequentiell.metrics_collector import MetricsCollector
 class TrainingPipeline:
     def __init__(self, env_name: str, engines_dict, batch_size, episodes, steps_per_episode, agent: BaseAgent, engine_dropout=False, drop_out_limit=None, dashboard_active=True):
         self.env_name = env_name
-        self.total_envs = sum(agent.replay_buffer.engine_counts.values())
+        self.agent = agent
         self.batch_size = batch_size
         self.episodes = episodes
         self.steps_per_episode = steps_per_episode
         self.engines_dict = engines_dict
         self.envs = EnvironmentOrchestrator(env_name, engines_dict)
-        self.rewards_history = []
-        self.agent = agent
         self.stats = MetricsCollector(engines_dict)
+        self.rewards_history = []
         self.engine_dropout = engine_dropout
         self.drop_out_limit = drop_out_limit
         self.dashboard_active = dashboard_active
+        self.total_envs = sum(agent.replay_buffer.engine_counts.values())
 
         # Setup dashboard
         if dashboard_active:
