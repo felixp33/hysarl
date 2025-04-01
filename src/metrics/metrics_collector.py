@@ -17,7 +17,8 @@ class MetricsCollector:
         self.step_times = {engine: [] for engine in self.unique_engines}
         self.episode_durations = {engine: [] for engine in self.unique_engines}
         self.episode_steps = {engine: [] for engine in self.unique_engines}
-
+        self.instance_rewards = {i: []
+                                 for i in range(sum(engines_dict.values()))}
         self.engine_indices = {}
         self.agent_diagnostic = []
 
@@ -28,8 +29,6 @@ class MetricsCollector:
                 self.engine_indices[engine].append(env_id)
                 env_id += 1
 
-        self.instance_rewards = {i: []
-                                 for i in range(sum(engines_dict.values()))}
         self.td_errors = []
 
     def start_instance_timing(self, engine):

@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from src.agents.base_agent import BaseAgent
-from src.dashboard import Dashboard
 
-from src.environment_orchestrator import EnvironmentOrchestrator
-from src.sequentiell.metrics_collector import MetricsCollector
+from src.metrics.dashboard import Dashboard
+from src.sequentiell.environment_orchestrator import EnvironmentOrchestrator
+from src.metrics.metrics_collector import MetricsCollector
 
 
 class TrainingPipeline:

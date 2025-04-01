@@ -13,7 +13,7 @@ def halfchetah_experiment_sac(sampling_composition, n_runs=1):
             capacity=500000,
             strategy='stratified',
             sampling_composition=sampling_composition,
-            buffer_composition={'mujoco': 1.0, 'brax': 1.0},
+            buffer_composition={'mujoco': 0.5, 'brax': 0.5},
             engine_counts=engines,
             recency_bias=3.0
         )

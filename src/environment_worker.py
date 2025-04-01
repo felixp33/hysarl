@@ -3,7 +3,7 @@ import gymnasium as gym
 from multiprocessing import Process, Pipe
 import numpy as np
 import traceback
-from src.environment_orchestrator import get_env_specs
+from src.sequentiell.environment_orchestrator import get_env_specs
 # Import Brax registration
 register_brax_envs()  # Register Brax environments with Gymnasium
 
