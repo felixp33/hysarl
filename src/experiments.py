@@ -75,7 +75,7 @@ def walker_experiment_sac(sampling_composition, n_runs=1):
         pipeline = TrainingPipeline(
             env_name='Walker2d',
             batch_size=512,
-            episodes=2000,
+            episodes=500,
             steps_per_episode=1000,
             agent=sac_agent_walker,
             engine_dropout=False,
@@ -155,7 +155,7 @@ def halfcheetah_experiment_td3(sampling_composition, n_runs=1):
         pipeline = TrainingPipeline(
             env_name='HalfCheetah',
             batch_size=512,
-            episodes=2000,
+            episodes=500,
             steps_per_episode=1000,
             agent=sac_agent_walker,
             engine_dropout=False,
@@ -194,7 +194,46 @@ def walker_experiment_td3(sampling_composition, n_runs=1):
         pipeline = TrainingPipeline(
             env_name='Walker2d',
             batch_size=512,
-            episodes=2000,
+            episodes=500,
+            steps_per_episode=1000,
+            agent=sac_agent_walker,
+            engine_dropout=False,
+            dashboard_active=True,
+            engines_dict=engines
+        )
+
+        pipeline.run()
+
+
+def quick_test_experiment(sampling_composition, n_runs=1):
+    for _ in range(n_runs):
+
+        engines = {'mujoco': 1, 'brax': 1}
+
+        composition_buffer = CompositionReplayBuffer(
+            capacity=500000,
+            strategy='stratified',
+            sampling_composition=sampling_composition,
+            buffer_composition={'mujoco': 0.5, 'brax': 0.5},
+            engine_counts=engines,
+            recency_bias=1.0
+        )
+
+        sac_agent_walker = TD3Agent(state_dim=17,
+                                    action_dim=6,
+                                    replay_buffer=composition_buffer,
+                                    hidden_dim=256,
+                                    lr=3e-4,
+                                    gamma=0.99,
+                                    tau=0.005,
+                                    policy_noise=0.2,
+                                    noise_clip=0.5,    # TD3-specific parameter
+                                    policy_delay=2)    # TD3-specific parameter
+
+        pipeline = TrainingPipeline(
+            env_name='Walker2d',
+            batch_size=512,
+            episodes=30,
             steps_per_episode=1000,
             agent=sac_agent_walker,
             engine_dropout=False,

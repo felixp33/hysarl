@@ -84,58 +84,61 @@ class MetricsCollector:
         """Update TD errors for each training step"""
         self.td_errors.append(td_errors)
 
-    def export_to_csv(self, output_dir='logs', filename=None):
+    def export_to_csv(self, output_dir='logs', agent_type=None, filename=None):
         """
         Export ALL collected training statistics to CSV files with complete history.
 
         Args:
             output_dir (str): Directory to save CSV files
+            agent_type (str): Type of agent (SAC, TD3)
             filename (str, optional): Base filename. If None, a timestamp will be used
         """
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
+        timestamp = int(time.time())
 
-        # Generate timestamp for filename if not provided
-        if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"training_stats_{timestamp}"
-
-        # Export each type of data to its own CSV file
+        # Base filename format
+        if filename:
+            base_filename = filename
+        else:
+            if hasattr(self, 'env_name'):
+                env_name = self.env_name.lower()
+            base_filename = f"{env_name}_{timestamp}"
 
         # 1. Export rewards
         rewards_df = pd.DataFrame()
         for engine, rewards in self.type_rewards.items():
             rewards_df[f"{engine}_reward"] = pd.Series(rewards)
         rewards_df.to_csv(
-            f"{output_dir}/{filename}_rewards.csv", index_label='episode')
+            f"{output_dir}/{base_filename}_rewards_{timestamp}.csv", index_label='episode')
 
         # 2. Export episode durations
         durations_df = pd.DataFrame()
         for engine, durations in self.episode_durations.items():
             durations_df[f"{engine}_duration"] = pd.Series(durations)
         durations_df.to_csv(
-            f"{output_dir}/{filename}_durations.csv", index_label='episode')
+            f"{output_dir}/{base_filename}_durations_{timestamp}.csv", index_label='episode')
 
         # 3. Export step times (raw step timing data)
         step_times_df = pd.DataFrame()
         for engine, times in self.step_times.items():
             step_times_df[f"{engine}_step_times"] = pd.Series(times)
         step_times_df.to_csv(
-            f"{output_dir}/{filename}_step_times.csv", index_label='step')
+            f"{output_dir}/{base_filename}_step_times_{timestamp}.csv", index_label='step')
 
         # 4. Export episode steps
         steps_df = pd.DataFrame()
         for engine, steps in self.episode_steps.items():
             steps_df[f"{engine}_steps"] = pd.Series(steps)
-        steps_df.to_csv(f"{output_dir}/{filename}_steps.csv",
-                        index_label='episode')
+        steps_df.to_csv(
+            f"{output_dir}/{base_filename}_steps_{timestamp}.csv", index_label='episode')
 
         # 5. Export instance rewards
         instance_df = pd.DataFrame()
         for instance_id, rewards in self.instance_rewards.items():
             instance_df[f"instance_{instance_id}_reward"] = pd.Series(rewards)
         instance_df.to_csv(
-            f"{output_dir}/{filename}_instance_rewards.csv", index_label='episode')
+            f"{output_dir}/{base_filename}_instance_rewards_{timestamp}.csv", index_label='episode')
 
         # 6. Export TD errors - handling the nested list structure
         if self.td_errors:
@@ -152,10 +155,11 @@ class MetricsCollector:
                 'episode': episode_indices,
                 'td_error': flattened_td_errors
             })
-            td_df.to_csv(f"{output_dir}/{filename}_td_errors.csv", index=False)
+            td_df.to_csv(
+                f"{output_dir}/{base_filename}_td_errors_{timestamp}.csv", index=False)
 
         print(
-            f"✅ All training statistics exported to {output_dir}/{filename}_*.csv")
+            f"✅ All training statistics exported to {output_dir}/{base_filename}_*_{timestamp}.csv")
 
     def export_to_hdf5(self, output_dir='./logs', download_local=True, save_to_drive=False):
         """
@@ -255,20 +259,20 @@ class MetricsCollector:
                         **compression_opts
                     )
 
-            # Add metadata
+                # Add metadata
             timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             metadata_group.create_dataset(
-                'timestamp', data=np.string_(timestamp_str))
+                'timestamp', data=np.bytes_(timestamp_str))  # Changed np.string_ to np.bytes_
 
             # Store engines configuration
             engines_str = str(self.engines_dict)
             metadata_group.create_dataset(
-                'engines', data=np.string_(engines_str))
+                'engines', data=np.bytes_(engines_str))  # Changed np.string_ to np.bytes_
 
             # Store sampling composition in metadata if available
             if sampling_info:
                 metadata_group.create_dataset(
-                    'sampling_composition', data=np.string_(sampling_info))
+                    'sampling_composition', data=np.bytes_(sampling_info))  # Changed np.string_ to np.bytes_
 
             # Store total episodes
             num_episodes = len(next(iter(self.type_rewards.values())))

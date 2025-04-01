@@ -146,7 +146,45 @@ class TrainingPipeline:
             traceback.print_exc()
             raise
         finally:
-            self.stats.export_to_csv()
+            base_filename = self.generate_export_filename()
+            self.stats.export_to_csv(filename=base_filename, output_dir='data')
             self.envs.close()
             if self.dashboard_active:
                 self.dashboard.close()
+
+    def generate_export_filename(self):
+        """
+        Generate a filename for exporting metrics in the format:
+        {agent}_{experiment}_{composition}
+
+        Returns:
+            str: Base filename without extension
+        """
+        # Determine agent type from the agent object
+        agent_type = "unknown"
+        if hasattr(self.agent, "__class__"):
+            agent_class = self.agent.__class__.__name__
+            print(f"Agent class: {agent_class}")
+            if "SAC" in agent_class:
+                agent_type = "sac"
+            elif "TD3" in agent_class:
+                print(f"Agent class: {agent_class} true")
+                agent_type = "td3"
+
+        # Get environment name
+        env_name = self.env_name.lower()
+
+        # Get composition information from the replay buffer
+        composition_str = ""
+        if hasattr(self.agent, "replay_buffer") and hasattr(self.agent.replay_buffer, "sampling_composition"):
+            composition = self.agent.replay_buffer.sampling_composition
+            for engine, percentage in composition.items():
+                if engine.startswith("m"):  # mujoco
+                    composition_str += f"m{int(percentage*100)}"
+                elif engine.startswith("b"):  # brax
+                    composition_str += f"b{int(percentage*100)}"
+
+        # Create base filename
+        print('agent_type', agent_type, 'env_name',
+              env_name, 'composition_str', composition_str)
+        return f"{agent_type}_{env_name}_{composition_str}"
