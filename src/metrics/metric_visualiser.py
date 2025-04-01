@@ -24,62 +24,128 @@ class MetricsVisualizer:
         self.timesteps = None
         self.experiment = None
         self.loaded_files = []
+        self.num_files = 0
 
-    def get(self, composition, experiment=None, file_path=None, data_dir=None):
-        """Load metrics data based on composition dictionary and experiment name
+    def get(self, composition, experiment, data_dir="."):
+        """Load metrics data based on environment name and composition
 
         Args:
             composition: Dict mapping algorithm names to weights (e.g., {'mujoco': 0.8, 'brax': 0.2})
-            experiment: Experiment name (e.g., 'HalfCheetah', 'Walker2d')
-            file_path: Direct path to a CSV file (optional)
-            data_dir: Optional directory to search for CSV files
+            experiment: Environment name (e.g., 'halfcheetah', 'walker2d')
+            data_dir: Directory to search for CSV files
 
         Returns:
             self, for method chaining
         """
         self.composition = composition
-        if experiment:
-            self.experiment = experiment.lower()
+        self.experiment = experiment.lower()
         self.data = {}
+        self.loaded_files = []
 
-        # If direct file path is provided, use it
-        if file_path and os.path.exists(file_path):
-            self.loaded_files.append(file_path)
-            self._load_file(file_path)
-            return self
-
-        # Otherwise, search for matching files based on experiment and composition
-        if not experiment:
-            raise ValueError("Either file_path or experiment must be provided")
-
-        # Extract algorithm weights
+        # Calculate weights for filename pattern
         mujoco_weight = int(composition.get('mujoco', 0) * 100)
         brax_weight = int(composition.get('brax', 0) * 100)
 
-        # Create file pattern
-        file_pattern = f"{self.experiment}_m{mujoco_weight}_b{brax_weight}_*.csv"
-
-        # Add data directory if provided
-        search_path = os.path.join(
-            data_dir, file_pattern) if data_dir else file_pattern
+        # Create the file pattern based on the schema
+        # Format: {environment}_m{mujoco_weight}_b{brax_weight}_*.csv
+        file_pattern = f"{self.experiment.lower()}_m{mujoco_weight}_b{brax_weight}_*.csv"
+        search_path = os.path.join(data_dir, file_pattern)
 
         # Find matching files
         matching_files = glob.glob(search_path)
 
-        if matching_files:
-            # Use the first matching file
-            file_path = matching_files[0]
-            self.loaded_files.append(file_path)
-            self._load_file(file_path)
-        else:
+        if not matching_files:
             raise FileNotFoundError(
-                f"No CSV files found matching pattern '{search_path}'")
+                f"No files found matching pattern: {search_path}")
+
+        # Track the number of files
+        self.num_files = len(matching_files)
+        print(f"Found {self.num_files} matching files")
+
+        # Initialize data collectors for averaging across files
+        all_file_data = {
+            'mujoco': [],
+            'brax': []
+        }
+
+        # Load all matching files
+        for file_path in matching_files:
+            self.loaded_files.append(file_path)
+
+            # Load file data into the collector
+            file_data = self._load_file_data(file_path)
+
+            # Add to collectors
+            for algo in self.composition.keys():
+                if algo in file_data:
+                    all_file_data[algo].append(file_data[algo])
+
+        # Process aggregate data for each algorithm
+        for algo_name in self.composition.keys():
+            algo_files = all_file_data[algo_name]
+
+            if not algo_files:
+                continue
+
+            # Ensure all files have data available for this algorithm
+            if len(algo_files) != self.num_files:
+                print(
+                    f"Warning: Only {len(algo_files)} of {self.num_files} files have data for {algo_name}")
+
+            # Process aggregate data
+            self._process_aggregate_data(algo_name, algo_files)
 
         return self
 
-    def _load_file(self, file_path):
-        """Load and process a CSV file with expected column names:
-           episode, mujoco_reward, brax_reward
+    def get_by_filename(self, composition, file_path):
+        """Load metrics data directly from a specific file
+
+        Args:
+            composition: Dict mapping algorithm names to weights (e.g., {'mujoco': 0.8, 'brax': 0.2})
+            file_path: Direct path to a CSV file
+
+        Returns:
+            self, for method chaining
+        """
+        self.composition = composition
+        self.data = {}
+        self.loaded_files = []
+
+        # Extract experiment name from filename if possible
+        filename = os.path.basename(file_path)
+        parts = filename.split('_')
+        if len(parts) > 0:
+            self.experiment = parts[0].lower()
+
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        self.loaded_files.append(file_path)
+        self.num_files = 1
+
+        # Load file data
+        file_data = self._load_file_data(file_path)
+
+        # Process data for each algorithm
+        for algo_name in self.composition.keys():
+            if algo_name in file_data:
+                # For a single file, just use the file data directly
+                self._process_algorithm_data(
+                    algo_name,
+                    file_data[algo_name]['episodes'],
+                    file_data[algo_name]['rewards']
+                )
+
+        return self
+
+    def _load_file_data(self, file_path):
+        """Load data from a CSV file and return it without processing
+
+        Args:
+            file_path: Path to the CSV file
+
+        Returns:
+            dict: Dictionary with algorithm data
         """
         try:
             # Load CSV data
@@ -97,21 +163,97 @@ class MetricsVisualizer:
             # Extract data from columns
             episodes = df['episode'].values
 
-            # Process data for each algorithm in the composition
+            # Collect data for each algorithm
+            file_data = {}
+
             if 'mujoco' in self.composition:
                 mujoco_rewards = df['mujoco_reward'].values
-                self._process_algorithm_data(
-                    'mujoco', episodes, mujoco_rewards)
+                file_data['mujoco'] = {
+                    'episodes': episodes,
+                    'rewards': mujoco_rewards
+                }
 
             if 'brax' in self.composition:
                 brax_rewards = df['brax_reward'].values
-                self._process_algorithm_data('brax', episodes, brax_rewards)
+                file_data['brax'] = {
+                    'episodes': episodes,
+                    'rewards': brax_rewards
+                }
+
+            return file_data
 
         except Exception as e:
-            raise Exception(f"Error loading {file_path}: {str(e)}")
+            print(f"Error loading {file_path}: {str(e)}")
+            return {}
+
+    def _process_aggregate_data(self, algo_name, file_data_list):
+        """Process aggregate data across multiple files for an algorithm
+
+        Args:
+            algo_name: Name of the algorithm
+            file_data_list: List of data dictionaries from multiple files
+        """
+        # First, ensure all files have the same episode lengths
+        # If not, we'll need to interpolate to a common x-axis
+        episode_arrays = [data['episodes'] for data in file_data_list]
+        reward_arrays = [data['rewards'] for data in file_data_list]
+
+        # Find the shortest episode length to use as reference
+        min_episodes = min(len(episodes) for episodes in episode_arrays)
+
+        # Truncate all arrays to the minimum length
+        episodes = episode_arrays[0][:min_episodes]
+        rewards_matrix = np.array([rewards[:min_episodes]
+                                  for rewards in reward_arrays])
+
+        # Calculate mean and std across files at each episode
+        mean_rewards = np.mean(rewards_matrix, axis=0)
+
+        # For std, we'll compute the combined standard deviation across files
+        if len(file_data_list) > 1:
+            std_rewards = np.std(rewards_matrix, axis=0)
+        else:
+            # For a single file, we'll estimate std using a rolling window
+            std_rewards = np.zeros_like(mean_rewards)
+            window = min(self.window_size, len(mean_rewards) // 5)
+            if window > 1:
+                for i in range(len(mean_rewards)):
+                    start = max(0, i - window // 2)
+                    end = min(len(mean_rewards), i + window // 2 + 1)
+                    std_rewards[i] = np.std(mean_rewards[start:end])
+
+        # Apply smoothing to mean rewards
+        if len(mean_rewards) >= self.window_size:
+            smoothed_rewards = sliding_window_avg(
+                mean_rewards, self.window_size)
+
+            # Also smooth the std to match
+            smoothed_std = sliding_window_avg(std_rewards, self.window_size)
+
+            # Adjusted episodes to match smoothed array length
+            offset = (self.window_size - 1) // 2
+            episodes_smooth = episodes[offset:-(offset)]
+        else:
+            # Not enough data points for smoothing, use raw data
+            smoothed_rewards = mean_rewards
+            smoothed_std = std_rewards
+            episodes_smooth = episodes
+
+        # Store the processed data
+        self.data[algo_name] = {
+            'episodes': episodes,
+            'rewards': mean_rewards,
+            'smoothed_rewards': smoothed_rewards,
+            'std': smoothed_std,
+            'episodes_smooth': episodes_smooth
+        }
+
+        # Set the episodes reference if not already set
+        if self.timesteps is None and len(episodes_smooth) > 0:
+            self.timesteps = episodes_smooth
 
     def _process_algorithm_data(self, algo_name, episodes, rewards):
-        """Process data for a single algorithm"""
+        """Process data for a single algorithm from a single file"""
         # Apply smoothing
         if len(rewards) >= self.window_size:
             smoothed_rewards = sliding_window_avg(rewards, self.window_size)
@@ -159,7 +301,8 @@ class MetricsVisualizer:
             matplotlib.figure.Figure: The generated plot
         """
         if not self.data:
-            raise ValueError("No data loaded. Call get() first.")
+            raise ValueError(
+                "No data loaded. Call get() or get_by_filename() first.")
 
         # Create the plot
         fig, ax = plt.subplots(figsize=figsize)
@@ -170,7 +313,12 @@ class MetricsVisualizer:
 
             color = self.colors.get(algo_name, "green")
             weight = self.composition.get(algo_name, 1.0)
-            label = f"{algo_name.capitalize()} (w={weight:.2f})"
+
+            # Add seed count to label if multiple files
+            if self.num_files > 1:
+                label = f"{algo_name.capitalize()} (w={weight:.2f}, n={self.num_files})"
+            else:
+                label = f"{algo_name.capitalize()} (w={weight:.2f})"
 
             # Plot the smoothed reward line
             ax.plot(
@@ -192,20 +340,11 @@ class MetricsVisualizer:
         # Create a simplified title if none provided
         if title is None:
             if self.experiment:
-                # Format experiment name properly (capitalize each word)
-                env_name = ' '.join(word.capitalize()
-                                    for word in self.experiment.split('_'))
+                # Format experiment name properly (capitalize first letter)
+                env_name = self.experiment.capitalize()
                 title = f"Reward - {env_name}"
             else:
-                # Extract environment name from filename if possible
-                filename = os.path.basename(
-                    self.loaded_files[0]) if self.loaded_files else ""
-                parts = filename.split('_')
-                if len(parts) > 0:
-                    env_name = parts[0].capitalize()
-                    title = f"Reward - {env_name}"
-                else:
-                    title = "Reward Performance"
+                title = "Reward Performance"
 
         # Set plot labels and styling
         ax.set_xlabel(xlabel)
