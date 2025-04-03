@@ -1,6 +1,6 @@
 # HySARL: Hybrid Simulation Architecture for Reinforcement Learning
 
-![HySARL](https://img.shields.io/badge/HySARL-Reinforcement_Learning-blue)
+![HySaRL](https://img.shields.io/badge/HySARL-Reinforcement_Learning-blue)
 ![Python](https://img.shields.io/badge/Python-3.10-green)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.2.2-orange)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
@@ -9,7 +9,7 @@ HySARL is a framework for reinforcement learning research that allows seamless i
 
 ## 🔍 Overview
 
-HySARL (Hybrid Simulation Architecture for Reinforcement Learning) addresses a common challenge in RL research: inconsistencies between simulation environments. By providing a unified framework that supports multiple physics engines (currently MuJoCo and Brax), HySARL enables:
+HySaRL (Hybrid Simulation Architecture for Reinforcement Learning) addresses a common challenge in RL research: inconsistencies between simulation environments. By providing a unified framework that supports multiple physics engines (currently MuJoCo and Brax), HySaRL enables:
 
 - Training on multiple simulation backends simultaneously
 - Comparing performance across different physics engines
@@ -80,16 +80,16 @@ plt.show()
 
 ## 🏛️ Architecture
 
-HySARL consists of several key components:
-
-1. **Environment Orchestrator**: Manages multiple simulation engines and provides a unified interface
-2. **Composition Buffer**: Sophisticated replay buffer that supports stratified sampling from different sources
+1. **Composition Buffer**: Sophisticated replay buffer that supports stratified sampling from different sources
+2. **Environment Orchestrator**: Manages multiple simulation engines [MuJoCo, Brax] and provides a unified interface 
 3. **Agents**: Implementation of SAC and TD3 algorithms
 4. **Training Pipeline**: Coordinates training across multiple environments
-5. **Metrics Collector**: Gathers and analyzes performance metrics
+5. **Metrics/Visualisation**: components to collect, read and anlayze data, including live dashboard
 
 📊 Experiments
-The repository contains several pre-configured experiments
+The repository contains several pre-configured experiments in the experiments
+
+
 
 
 
