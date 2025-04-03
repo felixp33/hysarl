@@ -1,4 +1,4 @@
-# HySaRL: Hybrid Simulation Architecture for Reinforcement Learning
+# HySaRL: Hybrid Sampling for Reinforcement Learning
 
 ![HySaRL](https://img.shields.io/badge/HySARL-Reinforcement_Learning-blue)
 ![Python](https://img.shields.io/badge/Python-3.10-green)
