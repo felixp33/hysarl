@@ -24,7 +24,6 @@ def register_brax_envs():
     except (gym.error.NameNotFound, KeyError, AttributeError):
         pass
 
-    # Create a wrapper class to make Brax environments compatible with Gymnasium
     class FastBraxEnv(gym.Env):
         """
         A fast wrapper for Brax environments using JAX JIT compilation.

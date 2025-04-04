@@ -87,7 +87,6 @@ class EnvironmentOrchestrator:
         self.envs = {}
         self.active_envs = []
 
-        # Create one environment for each engine type
         register_all_envs()
 
         for engine_type in engines_dict.keys():
@@ -106,7 +105,7 @@ class EnvironmentOrchestrator:
         print(
             f"✅ Created {len(self.envs)} environment types for sequential training.")
 
-    def run_episode(self, engine_type, agent, steps_per_episode, episode_num, stats=None):
+    def run_episode_for_engine(self, engine_type, agent, steps_per_episode, episode_num, stats=None):
         """
         Run a single episode on one environment.
 

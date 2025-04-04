@@ -51,7 +51,7 @@ class TrainingPipeline:
                 for engine_type in self.engines_dict.keys():
 
                     # Run episode for this engine
-                    reward, steps, done = self.envs.run_episode(
+                    reward, steps, done = self.envs.run_episode_for_engine(
                         engine_type=engine_type,
                         agent=self.agent,
                         steps_per_episode=self.steps_per_episode,
@@ -67,7 +67,6 @@ class TrainingPipeline:
                         idx = self.stats.engine_indices[engine_type][i]
                         episode_dones[idx] = done
 
-                    # Train the agent multiple times after each environment episode
                 train_iterations = int(np.mean(list(episode_steps.values())))
                 self.agent.td_error_history = []
 

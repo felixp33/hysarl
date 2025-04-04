@@ -15,7 +15,7 @@ def halfchetah_experiment_sac(sampling_composition, n_runs=1):
             sampling_composition=sampling_composition,
             buffer_composition={'mujoco': 0.5, 'brax': 0.5},
             engine_counts=engines,
-            recency_bias=3.0
+            recency_bias=2.0
         )
 
         sac_agent = SACAgent(
@@ -38,7 +38,7 @@ def halfchetah_experiment_sac(sampling_composition, n_runs=1):
             steps_per_episode=1000,
             agent=sac_agent,
             engine_dropout=False,
-            dashboard_active=True,
+            dashboard_active=False,
             engines_dict=engines
         )
 
@@ -79,7 +79,7 @@ def walker_experiment_sac(sampling_composition, n_runs=1):
             steps_per_episode=1000,
             agent=sac_agent_walker,
             engine_dropout=False,
-            dashboard_active=True,
+            dashboard_active=False,
             engines_dict=engines
         )
 
@@ -120,7 +120,7 @@ def ant_experiment_sac(sampling_composition, n_runs=1):
             steps_per_episode=1000,
             agent=sac_agent,
             engine_dropout=False,
-            dashboard_active=True,
+            dashboard_active=False,
             engines_dict=engines
         )
 
@@ -141,25 +141,25 @@ def halfcheetah_experiment_td3(sampling_composition, n_runs=1):
             recency_bias=1.0
         )
 
-        sac_agent_walker = TD3Agent(state_dim=17,
-                                    action_dim=6,
-                                    replay_buffer=composition_buffer,
-                                    hidden_dim=512,
-                                    lr=3e-4,
-                                    gamma=0.99,
-                                    tau=0.005,
-                                    policy_noise=0.2,
-                                    noise_clip=0.5,
-                                    policy_delay=2)
+        td3_agent_halfcheetah = TD3Agent(state_dim=17,
+                                         action_dim=6,
+                                         replay_buffer=composition_buffer,
+                                         hidden_dim=512,
+                                         lr=3e-4,
+                                         gamma=0.99,
+                                         tau=0.005,
+                                         policy_noise=0.2,
+                                         noise_clip=0.5,
+                                         policy_delay=2)
 
         pipeline = TrainingPipeline(
             env_name='HalfCheetah',
-            batch_size=512,
+            batch_size=256,
             episodes=500,
             steps_per_episode=1000,
-            agent=sac_agent_walker,
+            agent=td3_agent_halfcheetah,
             engine_dropout=False,
-            dashboard_active=True,
+            dashboard_active=False,
             engines_dict=engines
         )
 
@@ -198,7 +198,7 @@ def walker_experiment_td3(sampling_composition, n_runs=1):
             steps_per_episode=1000,
             agent=sac_agent_walker,
             engine_dropout=False,
-            dashboard_active=True,
+            dashboard_active=False,
             engines_dict=engines
         )
 
@@ -237,7 +237,7 @@ def quick_test_experiment(sampling_composition, n_runs=1):
             steps_per_episode=1000,
             agent=sac_agent_walker,
             engine_dropout=False,
-            dashboard_active=True,
+            dashboard_active=False,
             engines_dict=engines
         )
 
