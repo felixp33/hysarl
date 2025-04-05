@@ -26,53 +26,67 @@ class MetricsVisualizer:
         self.loaded_files = []
         self.num_files = 0
 
-    def get(self, composition, experiment, data_dir="."):
-        """Load metrics data based on environment name and composition
+    def get(self, agent, experiment, composition=None, metric="rewards", data_dir="."):
+        """Load metrics data for all files matching a specific experiment configuration
 
         Args:
-            composition: Dict mapping algorithm names to weights (e.g., {'mujoco': 0.8, 'brax': 0.2})
+            agent: Agent name (e.g., 'td3', 'sac')
             experiment: Environment name (e.g., 'halfcheetah', 'walker2d')
-            data_dir: Directory to search for CSV files
+            composition: Dict mapping algorithm names to weights (e.g., {'mujoco': 1.0, 'brax': 0.0})
+                        If None, defaults to {'mujoco': 1.0, 'brax': 0.0}
+            metric: Metric to track (e.g., 'rewards', 'losses'). Defaults to 'rewards'
+            data_dir: Directory to search for CSV files (default is current directory)
 
         Returns:
             self, for method chaining
         """
-        self.composition = composition
+        self.agent = agent
         self.experiment = experiment.lower()
-        self.data = {}
+        self.metric = metric
         self.loaded_files = []
 
-        # Calculate weights for filename pattern
+        # Set default composition if not provided
+        if composition is None:
+            composition = {'mujoco': 1.0, 'brax': 0.0}
+        self.composition = composition
+
+        # Calculate weights for pattern
         mujoco_weight = int(composition.get('mujoco', 0) * 100)
         brax_weight = int(composition.get('brax', 0) * 100)
 
-        # Create the file pattern based on the schema
-        # Format: {environment}_m{mujoco_weight}_b{brax_weight}_*.csv
-        file_pattern = f"{self.experiment.lower()}_m{mujoco_weight}_b{brax_weight}_*.csv"
-        search_path = os.path.join(data_dir, file_pattern)
+        # Create the pattern to search for in filenames
+        pattern = f"{agent}_{experiment}_m{mujoco_weight}b{brax_weight}_{metric}"
 
-        # Find matching files
-        matching_files = glob.glob(search_path)
+        # List all files in the directory and filter for CSV files containing our pattern
+        all_files = os.listdir(data_dir)
+        matching_files = [
+            os.path.join(data_dir, f)
+            for f in all_files
+            if f.endswith('.csv') and pattern in f
+        ]
 
         if not matching_files:
             raise FileNotFoundError(
-                f"No files found matching pattern: {search_path}")
+                f"No files found matching pattern: {pattern}")
 
         # Track the number of files
         self.num_files = len(matching_files)
-        print(f"Found {self.num_files} matching files")
+        print(f"Found {self.num_files} matching files for {pattern}")
+
+        # Print the found files for debugging
+        for file_path in matching_files:
+            print(f"  - {os.path.basename(file_path)}")
+            self.loaded_files.append(file_path)
+
+        # Initialize the data dictionary
+        self.data = {}
 
         # Initialize data collectors for averaging across files
-        all_file_data = {
-            'mujoco': [],
-            'brax': []
-        }
+        all_file_data = {algo: [] for algo in self.composition.keys()}
 
         # Load all matching files
         for file_path in matching_files:
-            self.loaded_files.append(file_path)
-
-            # Load file data into the collector
+            # Load file data
             file_data = self._load_file_data(file_path)
 
             # Add to collectors
@@ -287,7 +301,7 @@ class MetricsVisualizer:
         if self.timesteps is None and len(episodes_smooth) > 0:
             self.timesteps = episodes_smooth
 
-    def plot_reward(self, title=None, xlabel="Episode", ylabel="Reward", figsize=(10, 6), save_path=None):
+    def plot_reward(self, title=None, xlabel="Episode", ylabel="Reward", figsize=(10, 6), save_path=None, show=True):
         """Plot reward metrics for all algorithms in the composition
 
         Args:
@@ -365,5 +379,167 @@ class MetricsVisualizer:
         # Save or show the plot
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+
+        return fig
+
+    def plot_single_engine(self, engine, window_size=10, title=None, xlabel="Episode", ylabel="Reward", figsize=(10, 6), save_path=None, show=True):
+        """Plot reward metrics for a single engine, showing each individual run as a separate line
+
+        Args:
+            engine: Engine name to plot (e.g., 'mujoco', 'brax')
+            window_size: Size of the moving average window (default: 10 episodes)
+            title: Optional plot title
+            xlabel: Label for x-axis
+            ylabel: Label for y-axis
+            figsize: Figure size as (width, height)
+            save_path: Optional path to save the figure instead of displaying
+            show: Whether to show the plot with plt.show() (default True)
+
+        Returns:
+            matplotlib.figure.Figure: The generated plot
+        """
+        if not self.loaded_files:
+            raise ValueError(
+                "No data loaded. Call get() or get_by_filename() first.")
+
+        if engine not in self.composition:
+            raise ValueError(
+                f"Engine '{engine}' not found in the composition. Available engines: {list(self.composition.keys())}")
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Load each file's data individually
+        line_data = []
+        for file_path in self.loaded_files:
+            try:
+                # Load CSV data
+                df = pd.read_csv(file_path)
+
+                # Check for required columns
+                column_name = f"{engine}_reward"
+                if column_name not in df.columns or 'episode' not in df.columns:
+                    print(
+                        f"Warning: File {os.path.basename(file_path)} missing required columns for {engine}")
+                    continue
+
+                # Extract data from columns
+                episodes = df['episode'].values
+                rewards = df[column_name].values
+
+                # Apply smoothing with specified window size but preserve all timesteps
+                if len(rewards) > 1:
+                    # Create a smoothed version with same length as original
+                    smoothed_rewards = np.zeros_like(rewards, dtype=float)
+
+                    # For each point, take average of surrounding points within window
+                    for i in range(len(rewards)):
+                        # Calculate window bounds, handle edges properly
+                        window_start = max(0, i - window_size // 2)
+                        window_end = min(len(rewards), i +
+                                         window_size // 2 + 1)
+                        # Calculate mean for this window
+                        smoothed_rewards[i] = np.mean(
+                            rewards[window_start:window_end])
+
+                    episodes_smooth = episodes  # Keep all episodes
+                else:
+                    smoothed_rewards = rewards
+                    episodes_smooth = episodes
+
+                # Add to our collection
+                line_data.append({
+                    'episodes': episodes_smooth,
+                    'rewards': smoothed_rewards,
+                    'file': os.path.basename(file_path)
+                })
+
+            except Exception as e:
+                print(f"Error processing {file_path}: {str(e)}")
+
+        if not line_data:
+            raise ValueError(
+                f"No valid data for engine '{engine}' in the loaded files")
+
+        # Plot each file as a separate line
+        color = self.colors.get(engine, "blue")
+        color_variants = plt.cm.Blues(np.linspace(0.4, 0.8, len(line_data))) if engine == "mujoco" else \
+            plt.cm.Oranges(np.linspace(0.4, 0.8, len(line_data)))
+
+        # Plot individual lines
+        for i, data in enumerate(line_data):
+            # Get shortened filename by removing prefix and timestamp
+            filename = data['file']
+            # Extract just the timestamp part for label
+            timestamp = filename.split('_')[-1].split('.')[0]
+
+            # Plot with a variant of the base color
+            ax.plot(
+                data['episodes'],
+                data['rewards'],
+                label=f"Run {i+1} ({timestamp})",
+                color=color_variants[i],
+                alpha=0.8,
+                linewidth=1.5
+            )
+
+        # Plot the mean as a thicker line if we have multiple files
+        if len(line_data) > 1:
+            # Find the minimum length to truncate all arrays (if we have multiple files)
+            if len(line_data) > 1:
+                # We're now using the full episode range for each file, so just use episodes directly
+                min_length = min(len(data['episodes']) for data in line_data)
+                episodes = line_data[0]['episodes'][:min_length]
+                rewards_matrix = np.array(
+                    [data['rewards'][:min_length] for data in line_data])
+            # Calculate mean
+            mean_rewards = np.mean(rewards_matrix, axis=0)
+
+            # Plot mean with a thicker, more prominent line
+            ax.plot(
+                episodes,
+                mean_rewards,
+                label=f"{engine.capitalize()} Mean (n={len(line_data)})",
+                color=color,
+                linewidth=2.5
+            )
+
+        # Create title if none provided
+        if title is None:
+            weight = self.composition.get(engine, 1.0)
+            if self.experiment:
+                env_name = self.experiment.capitalize()
+                title = f"{engine.capitalize()} Rewards (w={weight:.2f}) - {env_name}"
+            else:
+                title = f"{engine.capitalize()} Rewards (w={weight:.2f})"
+
+        # Set plot labels and styling
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10, loc='best')
+        ax.grid(True, linestyle='--', alpha=0.5)
+        ax.set_axisbelow(True)
+
+        # Set y-axis to start from zero if all rewards are positive
+        if all(np.min(data['rewards']) >= 0 for data in line_data):
+            ax.set_ylim(bottom=0)
+
+        plt.tight_layout()
+
+        # Save if a path is provided
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+        # Show the plot only if requested
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
 
         return fig
