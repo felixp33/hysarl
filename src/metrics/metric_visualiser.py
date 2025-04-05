@@ -543,3 +543,166 @@ class MetricsVisualizer:
             plt.close(fig)
 
         return fig
+
+    def plot_td_errors(self, agent, experiment, compositions, data_dir=".", window_size=10, title=None, xlabel="Time Step", ylabel="TD Error", figsize=(10, 6), save_path=None, show=True):
+        """Plot TD errors for multiple compositions on a single plot
+
+        Args:
+            agent: Agent name (e.g., 'td3', 'sac')
+            experiment: Environment name (e.g., 'halfcheetah', 'ant')
+            compositions: List of composition dictionaries to compare
+                        [{'mujoco': 1.0, 'brax': 0.0}, {'mujoco': 0.0, 'brax': 1.0}, ...]
+            data_dir: Directory to search for CSV files
+            window_size: Size of the moving average window
+            title: Optional plot title
+            xlabel: Label for x-axis
+            ylabel: Label for y-axis
+            figsize: Figure size as (width, height)
+            save_path: Optional path to save the figure instead of displaying
+            show: Whether to show the plot with plt.show() (default True)
+
+        Returns:
+            matplotlib.figure.Figure: The generated plot
+        """
+        # Create the plot
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Define a color cycle for different compositions
+        color_cycle = plt.cm.tab10(np.linspace(0, 1, len(compositions)))
+
+        # Track all loaded data for legend creation
+        loaded_data = []
+
+        # Process each composition
+        for i, composition in enumerate(compositions):
+            # Calculate weights for pattern
+            mujoco_weight = int(composition.get('mujoco', 0) * 100)
+            brax_weight = int(composition.get('brax', 0) * 100)
+
+            # Create a label for this composition
+            comp_label = f"m{mujoco_weight}b{brax_weight}"
+
+            # Create the pattern to search for in filenames
+            pattern = f"{agent}_{experiment}_m{mujoco_weight}b{brax_weight}_td_error"
+
+            # Get all CSV files in directory
+            all_files = os.listdir(data_dir)
+            matching_files = [
+                os.path.join(data_dir, f)
+                for f in all_files
+                if f.endswith('.csv') and pattern in f
+            ]
+
+            if not matching_files:
+                print(f"Warning: No files found matching pattern: {pattern}")
+                continue
+
+            num_files = len(matching_files)
+            print(f"Found {num_files} matching files for {pattern}")
+
+            # Initialize data collector for this composition
+            td_error_data = []
+
+            # Load data from all matching files
+            for file_path in matching_files:
+                try:
+                    # Load CSV data
+                    df = pd.read_csv(file_path)
+
+                    # Check columns
+                    if 'td_error' not in df.columns:
+                        print(
+                            f"Warning: No 'td_error' column found in {os.path.basename(file_path)}")
+                        continue
+
+                    # Special handling for the fixed-episode format
+                    if 'episode' in df.columns and df['episode'].nunique() <= 1:
+                        # Use row index as episode number if episode column contains all the same value
+                        episodes = np.arange(len(df))
+                    elif 'episode' in df.columns:
+                        episodes = df['episode'].values
+                    else:
+                        # If no episode column, use row index
+                        episodes = np.arange(len(df))
+
+                    # Extract TD error data
+                    td_errors = df['td_error'].values
+
+                    # Add to our data collection
+                    td_error_data.append({
+                        'episodes': episodes,
+                        'td_errors': td_errors
+                    })
+
+                except Exception as e:
+                    print(f"Error processing {file_path}: {str(e)}")
+
+            # Process data for this composition
+            if not td_error_data:
+                continue
+
+            # Find minimum episode length across all files
+            min_length = min(len(data['episodes']) for data in td_error_data)
+
+            # Create arrays for averaging
+            all_episodes = td_error_data[0]['episodes'][:min_length]
+            all_td_errors = np.array(
+                [data['td_errors'][:min_length] for data in td_error_data])
+
+            # Calculate mean TD error across files
+            mean_td_errors = np.mean(all_td_errors, axis=0)
+
+            # Apply smoothing while preserving all timesteps
+            smoothed_td_errors = np.zeros_like(mean_td_errors, dtype=float)
+            for j in range(len(mean_td_errors)):
+                window_start = max(0, j - window_size // 2)
+                window_end = min(len(mean_td_errors), j + window_size // 2 + 1)
+                smoothed_td_errors[j] = np.mean(
+                    mean_td_errors[window_start:window_end])
+
+            # Plot the line with appropriate color
+            line, = ax.plot(
+                all_episodes,
+                smoothed_td_errors,
+                label=f"{comp_label} (n={num_files})",
+                color=color_cycle[i],
+                linewidth=2
+            )
+
+            # Add to loaded data for reference
+            loaded_data.append({
+                'composition': comp_label,
+                'num_files': num_files,
+                'line': line
+            })
+
+        # Check if we have data to plot
+        if not loaded_data:
+            raise ValueError(
+                "No TD error data found for any of the specified compositions")
+
+        # Create title if none provided
+        if title is None:
+            title = f"{agent.upper()} TD Error - {experiment.capitalize()}"
+
+        # Set plot labels and styling
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10, loc='best')
+        ax.grid(True, linestyle='--', alpha=0.5)
+        ax.set_axisbelow(True)
+
+        plt.tight_layout()
+
+        # Save if a path is provided
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+        # Show the plot only if requested
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+
+        return fig
