@@ -4,4 +4,4 @@ from src.registration import register_all_envs
 register_all_envs()
 
 if __name__ == "__main__":
-    ant_experiment_td3({'mujoco': 0, 'brax': 1}, n_runs=1)
+    ant_experiment_td3({'mujoco': 0.75, 'brax': 0.25}, n_runs=1)
